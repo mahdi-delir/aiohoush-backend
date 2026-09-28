@@ -123,16 +123,3 @@ MAILERS = {
 }
 
 AUTH_USER_MODEL = "user.User"
-
-SECRET_KEY = django-insecure-%sqgx#1u4)0x6i_z-&1q1t4^n7(%!sp)o123$&t61ep6s6^4b=
-DEBUG = True
-ALLOWED_HOSTS = 127.0.0.1,localhost
-DB_NAME='aiodbmaiogi_db'
-DB_USER='postgres'
-DB_PASS='uy8ZBkbn6IuHcs5vFEHw'
-DB_HOST='remote-asiatech.runflare.com'
-DB_PORT='31887'
-REFIS_URL=
-PAYAMRESAN_API_KEY="256209-d5f027bede884c2db00c001e22cdbd3d"
-PAYAMRESAN_SENDER=5000407525
-PAYAMRESAN_API_URL=https://api.sms-webservice.com/api/V3/SendBulk
