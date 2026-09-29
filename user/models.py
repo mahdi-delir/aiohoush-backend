@@ -23,7 +23,7 @@ class Group(models.Model):
         return f"{self.code} - {self.title}"
     
 class UserManager(BaseUserManager):
-    def creat_user(self, mobile, password = None, **kwargs):
+    def create_user(self, mobile, password = None, **kwargs):
         if not mobile:
             raise ValueError(_('شماره موبایل برای ساخت کاربر الزامی است.'))
         mobile = normalize_mobile_to_09(mobile)
@@ -114,7 +114,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"${self.mobile} - ${self.first_name if self.first_name else None} ${self.last_name if self.last_name else None}"
 
 class UserProfilePicture(models.Model):
-    user = models.ForeignKey('settings.AUTH_USER_MODEL', on_delete=models.CASCADE, verbose_name=_('کاربر'), related_name='profile_pictures')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name=_('کاربر'), related_name='profile_pictures')
     picture = models.ImageField(upload_to='profilepictures/', verbose_name=_('عکس پروفایل'))
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('تاریخ بارگزاری'))
     is_deleted = models.BooleanField(default=False, verbose_name=_('حذف شده'))
@@ -155,8 +155,8 @@ class ReferralCode(models.Model):
     )
 
 class StudentMentorAssignment(models.Model):
-    student = models.ForeignKey('settings.AUTH_USER_MODEL', on_delete=models.CASCADE, related_name='mentor_assignments', verbose_name=_('دانش آموز'))
-    mentor = models.ForeignKey('settings.AUTH_USER_MODEL', on_delete=models.PROTECT, related_name='mentored_students_history', verbose_name=_('منتور'))
+    student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mentor_assignments', verbose_name=_('دانش آموز'))
+    mentor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='mentored_students_history', verbose_name=_('منتور'))
     started_at = models.DateTimeField(auto_now_add=True, verbose_name=_('تاریخ شروع'))
     ended_at = models.DateTimeField(null=True, blank=True, verbose_name=_('تاریخ پایان'))
     assigned_by = models.ForeignKey(

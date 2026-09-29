@@ -28,7 +28,7 @@ def national_id_validator(national_id):
     
     national_id = normalize_number_to_en(national_id)
     
-    if not national_id.isdigit or len(national_id) != 10:
+    if not national_id.isdigit() or len(national_id) != 10:
         raise ValidationError(_('کد ملی باید 10 رقم باشد'), code='invalid_national_id')
     
     if national_id == national_id[0]*10:
