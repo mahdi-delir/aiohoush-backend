@@ -7,21 +7,6 @@ from aiohoush.utilities.normalizers import normalize_mobile_to_09
 from aiohoush.utilities.validators import mobile_validator, national_id_validator, postal_code_validator
 # Create your models here.
 
-class Group(models.Model):
-    """
-    Group model
-    Fields:
-    code, title, is_active, created_at
-    نقش های سراسری مثل مدیرعامل شریک کارمند استاد دانشجو و ...
-    """
-    code = models.SlugField(unique=True, max_length=50)
-    title = models.CharField(max_length=100)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.code} - {self.title}"
-    
 class UserManager(BaseUserManager):
     def create_user(self, mobile, password = None, **kwargs):
         if not mobile:
@@ -42,13 +27,25 @@ class UserManager(BaseUserManager):
             raise ValueError(_('Superuser must have is_staff=True.'))
         if kwargs.get('is_superuser') is not True:
             raise ValueError(_('Superuser must have is_superuser=True.'))
-        return self.creat_user(mobile, password, **kwargs)
+        return self.create_user(mobile, password, **kwargs)
 
 class User(AbstractBaseUser, PermissionsMixin):
-    mobile=models.CharField(max_length=11,
-                            unique=True,
-                            verbose_name=_('شماره موبایل'),
-                            validators=[mobile_validator])
+    denied_permissions = models.ManyToManyField(
+            "auth.Permission",
+            blank=True,
+            related_name="users_denied_permission",
+            verbose_name=_("مجوزهای ممنوع‌شده"),
+            help_text=_(
+                "این مجوزها حتی در صورت دریافت از گروه یا مجوز مستقیم "
+                "ممنوع هستند. روی superuser فعال اثری ندارند."
+            ),
+        )
+    mobile=models.CharField(
+        max_length=11,
+        unique=True,
+        verbose_name=_('شماره موبایل'),
+        validators=[mobile_validator]
+        )
     first_name = models.CharField(max_length=50,
                                   blank=True,
                                   null=True,
@@ -100,18 +97,19 @@ class User(AbstractBaseUser, PermissionsMixin):
         related_name = 'referred_users'
     )
 
-    groups = models.ManyToManyField('user.Group', verbose_name='گروه ها', related_name='users')
-
     objects = UserManager()
     REQUIRED_FIELDS = []
     USERNAME_FIELD = 'mobile'
     EMAIL_FIELD = 'email'
 
     def user_pictures_qs(self):
-        return self.profile_pictures.filter(is_deleted = False).distinct()
+        return self.profile_pictures.filter(is_deleted = False).order_by('-id')
 
     def __str__(self):
-        return f"${self.mobile} - ${self.first_name if self.first_name else None} ${self.last_name if self.last_name else None}"
+        full_name = " ".join(
+            part for part in (self.first_name, self.last_name) if part
+        )
+        return f"{self.mobile} - {full_name}" if full_name else self.mobile
 
 class UserProfilePicture(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name=_('کاربر'), related_name='profile_pictures')
@@ -119,10 +117,8 @@ class UserProfilePicture(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('تاریخ بارگزاری'))
     is_deleted = models.BooleanField(default=False, verbose_name=_('حذف شده'))
 
-    def get_user_pictures(self, user):
-        return self
     def __str__(self):
-        return f"${self.user.mobile} - ${self.first_name if self.first_name else None} ${self.last_name if self.last_name else None}"
+        return f"عکس پروفایل {self.user}"
 
 class ReferralCode(models.Model):
     owner = models.ForeignKey(
@@ -171,13 +167,39 @@ class StudentMentorAssignment(models.Model):
     is_active = models.BooleanField(default=True, verbose_name=_('فعال'))
     
     class Meta:
-            constraints = [
-                models.CheckConstraint(
-                    condition=~models.Q(student=models.F("mentor")),
-                    name="student_mentor_must_differ",
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(student=models.F("mentor")),
+                name="student_mentor_must_differ",
+            ),
+            models.UniqueConstraint(
+                fields=["student"],
+                condition=models.Q(is_active=True),
+                name="unique_active_mentor_per_student",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(is_active=True, ended_at__isnull=True)
+                    | models.Q(is_active=False, ended_at__isnull=False)
                 ),
-            ]
+                name="mentor_assignment_status_matches_end",
+                violation_error_message=_(
+                    "تخصیص فعال نباید تاریخ پایان داشته باشد؛ "
+                    "تخصیص پایان‌یافته باید تاریخ پایان داشته باشد."
+                ),
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(ended_at__isnull=True)
+                    | models.Q(ended_at__gte=models.F("started_at"))
+                ),
+                name="mentor_assignment_end_after_start",
+                violation_error_message=_(
+                    "تاریخ پایان نمی‌تواند قبل از تاریخ شروع باشد."
+                ),
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.student.mobile} - {self.student.first_name if self.student.first_name else None} {self.student.last_name if self.student.last_name else None} -> {self.mentor.mobile} - {self.mentor.first_name if self.mentor.first_name else None}"
+        return f"{self.student} → {self.mentor}"
 

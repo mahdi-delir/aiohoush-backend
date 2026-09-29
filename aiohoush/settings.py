@@ -26,7 +26,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[])
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
+    "aiohoush.admin_apps.AiohoushAdminConfig",
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -71,10 +71,17 @@ WSGI_APPLICATION = 'aiohoush.wsgi.application'
 # https://docs.djangoproject.com/en/6.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env.str("DB_NAME"),
+        "USER": env.str("DB_USER"),
+        "PASSWORD": env.str("DB_PASS"),
+        "HOST": env.str("DB_HOST"),
+        "PORT": env.int("DB_PORT"),
+        "OPTIONS": {
+            "connect_timeout": 10,
+        },
+    },
 }
 
 
@@ -126,3 +133,7 @@ MAILERS = {
 }
 
 AUTH_USER_MODEL = "user.User"
+
+AUTHENTICATION_BACKENDS = [
+    "user.backends.PermissionOverrideBackend",
+]
