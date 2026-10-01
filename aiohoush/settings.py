@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'corsheaders',
 
     'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
 
     'user',
     'course',
@@ -143,3 +144,59 @@ AUTHENTICATION_BACKENDS = [
     "user.backends.PermissionOverrideBackend",
 ]
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env("REDIS_CACHE_URL"),
+    },
+    "throttling": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env("THROTTLE_REDIS_URL"),
+        "KEY_PREFIX": "aiohoush_throttle",
+    },
+}
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+     "DEFAULT_THROTTLE_RATES": {
+        "otp_request_mobile": env(
+            "OTP_MOBILE_THROTTLE_RATE"
+        ) if not DEBUG else '1000/h',
+
+        "otp_request_ip": env(
+            "OTP_IP_THROTTLE_RATE"
+        ) if not DEBUG else '1000/h',
+
+         "otp_verify_mobile": env(
+            "OTP_VERIFY_MOBILE_THROTTLE_RATE"
+        ) if not DEBUG else '1000/h',
+        
+        "otp_verify_ip": env(
+            "OTP_VERIFY_IP_THROTTLE_RATE"
+        ) if not DEBUG else '1000/h',
+        },
+}
+
+SIMPLE_JWT = {
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+
+
+OTP_EXPIRATION_SECONDS = env.int("OTP_EXPIRATION_SECONDS")
+
+OTP_REQUEST_LIMIT_24H = env.int(
+    "OTP_REQUEST_LIMIT_24H")
+
+PAYAMRESAN_API_URL = env("PAYAMRESAN_API_URL")
+PAYAMRESAN_API_KEY = env("PAYAMRESAN_API_KEY")
+PAYAMRESAN_SENDER = env("PAYAMRESAN_SENDER")
+SMS_CONNECT_TIMEOUT = env.float("SMS_CONNECT_TIMEOUT")
+SMS_READ_TIMEOUT = env.float("SMS_READ_TIMEOUT")
