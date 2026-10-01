@@ -158,7 +158,7 @@ CACHES = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "core.session_jwt_auth.SessionJWTAuthentication",
     ),
 
     "DEFAULT_PERMISSION_CLASSES": (
@@ -192,7 +192,6 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "SIGNING_KEY": env("JWT_SIGNING_KEY"),
-
 }
 
 

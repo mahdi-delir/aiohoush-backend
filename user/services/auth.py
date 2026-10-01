@@ -4,13 +4,15 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import APIException
 from rest_framework import status
+from rest_framework.request import Request
 
 from notification.models import OTPSMSToken
-from notification.services.otp import (
-    InvalidOTPError,
-    verify_otp,
-)
-from user.models import User
+from notification.services.otp import verify_otp
+
+from user.models import User, AuthSession
+
+from .session import create_auth_session
+
 
 class InactiveUserError(APIException):
     status_code = status.HTTP_200_OK
@@ -22,6 +24,7 @@ def login_with_otp(
     *,
     user:User,
     raw_code: str,
+    request: Request
 ) -> dict[str, str]:
     user = (
         User.objects
@@ -46,6 +49,10 @@ def login_with_otp(
         )
 
     refresh = RefreshToken.for_user(user)
+
+    session = create_auth_session(user=user, request=request)
+    refresh['sid'] = str(session.id)
+
     return {
         'access': str(refresh.access_token),
         'refresh': str(refresh)

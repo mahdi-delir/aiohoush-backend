@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
 from django.utils.translation import gettext_lazy as _
@@ -202,4 +204,90 @@ class StudentMentorAssignment(models.Model):
 
     def __str__(self):
         return f"{self.student} → {self.mentor}"
+
+class AuthSession(models.Model):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='auth_sessions',
+        verbose_name=_('کاربر')
+    )
+    ip_address = models.GenericIPAddressField(
+        null=True,
+        blank=True,
+        verbose_name=_("آدرس IP"),
+    )
+
+    user_agent = models.TextField(
+        blank=True,
+        verbose_name=_("User Agent"),
+    )
+
+    browser_name = models.CharField(
+            max_length=100,
+            blank=True,
+            verbose_name=_('نام مرورگر')
+        )
+    
+    browser_version = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("نسخه مرورگر"),
+    )
+
+    os_name = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("سیستم عامل"),
+    )
+
+    os_version = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_("نسخه سیستم عامل"),
+    )
+
+    device_type = models.CharField(
+        max_length=50,
+        blank=True,
+        verbose_name=_('نوع دستگاه')
+    )
+
+    device_brand = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name=_('برند دستگاه')
+    )
+
+    device_model = models.CharField(
+        max_length=150,
+        blank=True,
+        verbose_name=_('مدل دستگاه')
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_('زمان ایجاد')
+    )
+    
+    last_used_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_('زمان آخرین استفاده')
+    )
+    revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name=_('زمان ابطال')
+    )
+    def __str__(self):
+        return f"{self.user} - {self.id}"
+
+
+
+    
 

@@ -6,7 +6,6 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 
 from aiohoush.core.responses import APIResponse
 
@@ -22,7 +21,7 @@ from .throttles import (
 
 from notification.services.otp import InvalidOTPError
 
-from .serializers import LoginOTPRequestSerializer, LoginOTPVerifySerializer
+from .serializers import LoginOTPRequestSerializer, LoginOTPVerifySerializer, SessionTokenRefreshSerializer
 from .models import User
 from .services.auth import InactiveUserError, login_with_otp
 
@@ -99,6 +98,7 @@ class LoginOTPVerifyView(APIView):
         tokens = login_with_otp(
             user=user,
             raw_code=code,
+            request = request
         )
 
 
@@ -115,7 +115,7 @@ class RefreshTokenView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = TokenRefreshSerializer(
+        serializer = SessionTokenRefreshSerializer(
             data=request.data
         )
         serializer.is_valid(
