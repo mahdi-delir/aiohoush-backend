@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import LoginOTPRequestView, LoginOTPVerifyView, RefreshTokenView, LogoutView
+from .views import LoginOTPRequestView, LoginOTPVerifyView, RefreshTokenView, LogoutView, LogoutAllView
 
 
 urlpatterns = [
@@ -24,4 +24,9 @@ urlpatterns = [
         LogoutView.as_view(),
         name="logout",
     ),
+    path(
+        "auth/logout-all/",
+        LogoutAllView.as_view(),
+        name="logout-all",
+        ),
 ]

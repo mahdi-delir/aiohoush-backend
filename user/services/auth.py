@@ -11,6 +11,10 @@ from rest_framework.request import Request
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 
 from notification.models import OTPSMSToken
 from notification.services.otp import verify_otp
@@ -113,3 +117,53 @@ def logout_session(
     session.save(
         update_fields=["revoked_at"]
     )
+
+@transaction.atomic
+def logout_all_sessions(
+     *,
+    user: User,
+) -> None:
+    now = timezone.now()
+
+    user = (
+        User.objects
+        .select_for_update()
+        .get(pk=user.pk)
+    )
+
+    active_sessions = list(
+        AuthSession.objects
+        .select_for_update()
+        .filter(
+            user=user,
+            revoked_at__isnull=True,
+        )
+    )
+
+    if active_sessions:
+        AuthSession.objects.filter(
+            pk__in=[
+                session.pk
+                for session in active_sessions
+            ]
+        ).update(
+            revoked_at=now
+        )
+
+    outstanding_tokens = list(
+        OutstandingToken.objects
+        .select_for_update()
+        .filter(
+            user=user,
+            expires_at__gt=now,
+        )
+    )
+
+    if outstanding_tokens:
+        BlacklistedToken.objects.bulk_create(
+            [
+                BlacklistedToken(token=token)
+                for token in outstanding_tokens
+            ],
+            ignore_conflicts=True,
+        )

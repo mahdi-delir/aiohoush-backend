@@ -3,10 +3,12 @@ from uuid import UUID
 from django.utils import timezone
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
+from django.db import transaction
 
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.settings import api_settings
 
 
 from .models import User, AuthSession
@@ -40,12 +42,13 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
         **TokenRefreshSerializer.default_error_messages,
         "invalid_session": _("نشست کاربر معتبر نیست."),
     }
+    @transaction.atomic
     def validate(self, attrs):
         refresh = self.token_class(
             attrs['refresh']
         )
         session_id = refresh.get('sid')
-        user_id = refresh.get('user_id')
+        user_id = refresh.get(api_settings.USER_ID_CLAIM)
         if not session_id or not user_id:
             raise AuthenticationFailed(
                 self.error_messages[_("invalid_session")],
@@ -61,6 +64,7 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
             )
         session = (
             AuthSession.objects
+            .select_for_update()
             .filter(
                 id=session_uuid,
                 user_id=user_id,
@@ -74,11 +78,9 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
                 code="invalid_session",
             )
         data = super().validate(attrs)
-
-        AuthSession.objects.filter(
-            pk=session.pk
-        ).update(
-            last_used_at=timezone.now()
+        session.last_used_at = timezone.now()
+        session.save(
+            update_fields=["last_used_at"]
         )
 
         return data

@@ -4,7 +4,7 @@ from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from aiohoush.core.responses import APIResponse
@@ -23,7 +23,7 @@ from notification.services.otp import InvalidOTPError
 
 from .serializers import LoginOTPRequestSerializer, LoginOTPVerifySerializer, SessionTokenRefreshSerializer, LogoutSerializer
 from .models import User
-from .services.auth import login_with_otp, logout_session
+from .services.auth import login_with_otp, logout_session, logout_all_sessions
 
 class LoginOTPRequestView(APIView):
     authentication_classes = []
@@ -124,9 +124,11 @@ class RefreshTokenView(APIView):
         return APIResponse(
             success=True,
             message=_("توکن با موفقیت بروزرسانی شد."),
+            called_by='webapp',
             data=serializer.validated_data,
             status=status.HTTP_200_OK,
         )
+
 
 class LogoutView(APIView):
     authentication_classes = []
@@ -147,5 +149,25 @@ class LogoutView(APIView):
         return APIResponse(
             success=True,
             message=_("خروج با موفقیت انجام شد."),
+            called_by='webapp',
+            status=status.HTTP_200_OK,
+        )
+
+class LogoutAllView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def post(self, request):
+        logout_all_sessions(
+            user=request.user,
+        )
+
+        return APIResponse(
+            success=True,
+            message=_(
+                "خروج از تمام دستگاه‌ها با موفقیت انجام شد."
+            ),
+            called_by='webapp',
             status=status.HTTP_200_OK,
         )
