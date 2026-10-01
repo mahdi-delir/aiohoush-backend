@@ -164,6 +164,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+
+    "EXCEPTION_HANDLER": (
+        "core.exceptions.custom_exception_handler"
+    ),
+
      "DEFAULT_THROTTLE_RATES": {
         "otp_request_mobile": env(
             "OTP_MOBILE_THROTTLE_RATE"
@@ -176,7 +181,7 @@ REST_FRAMEWORK = {
          "otp_verify_mobile": env(
             "OTP_VERIFY_MOBILE_THROTTLE_RATE"
         ) if not DEBUG else '1000/h',
-        
+
         "otp_verify_ip": env(
             "OTP_VERIFY_IP_THROTTLE_RATE"
         ) if not DEBUG else '1000/h',
@@ -186,6 +191,8 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
+    "SIGNING_KEY": env("JWT_SIGNING_KEY"),
+
 }
 
 

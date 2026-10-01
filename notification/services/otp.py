@@ -8,14 +8,21 @@ from django.contrib.auth.hashers import make_password, check_password
 from django.db import transaction
 from django.utils import timezone
 
+from rest_framework.exceptions import APIException
+from rest_framework import status
+
 from notification.models import OTPSMSToken
 from user.models import User as UserModel
 
 
 User = get_user_model()
 
-class InvalidOTPError(Exception):
-    pass
+class InvalidOTPError(APIException):
+    status_code = status.HTTP_200_OK
+    default_detail = _("کد یکبار مصرف معتبر نیست.")
+    default_code = "invalid_otp"
+
+
 
 def generate_numeric_otp(length: int = 6) -> str:
     if length <= 0:

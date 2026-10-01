@@ -5,8 +5,10 @@ from django.utils.translation import gettext_lazy as _
 
 from rest_framework import status
 from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+
+from aiohoush.core.responses import APIResponse
 
 from notification.models import OTPSMSToken
 from notification.tasks import send_otp_sms
@@ -59,13 +61,12 @@ class LoginOTPRequestView(APIView):
             reason=OTPSMSToken.OTPREASON.LOGIN,
         )
 
-        return Response(
-            {
-                'success':True,
-                'called_by': 'webapp',
-                "message": _("کد یکبار مصرف برای شما ارسال خواهد شد.")
-            },
+        return APIResponse(
+            success=True,
+            called_by='webapp',
+            message='درخواست ارسال پیامک انجام شد.',
             status=status.HTTP_202_ACCEPTED,
+            data={}
         )
 
 class LoginOTPVerifyView(APIView):
@@ -93,32 +94,36 @@ class LoginOTPVerifyView(APIView):
                 mobile=mobile
             )
         except User.DoesNotExist:
-            return Response(
-                {
-                    "detail": _(
-                        "کد یکبار مصرف معتبر نیست."
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            raise InvalidOTPError
 
-        try:
-            tokens = login_with_otp(
-                user=user,
-                raw_code=code,
-            )
+        tokens = login_with_otp(
+            user=user,
+            raw_code=code,
+        )
 
-        except (InvalidOTPError, InactiveUserError):
-            return Response(
-                {
-                    "detail": _(
-                        "کد یکبار مصرف معتبر نیست."
-                    )
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
 
-        return Response(
-            tokens,
+        return APIResponse(
+            success=True,
+            called_by='webapp',
+            message=_('توکن با موفقیت صادر شد.'),
+            data=tokens,
+            status=status.HTTP_200_OK,
+        )
+
+class RefreshTokenView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = TokenRefreshSerializer(
+            data=request.data
+        )
+        serializer.is_valid(
+            raise_exception=True
+        )
+        return APIResponse(
+            success=True,
+            message=_("توکن با موفقیت بروزرسانی شد."),
+            data=serializer.validated_data,
             status=status.HTTP_200_OK,
         )

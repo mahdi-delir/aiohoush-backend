@@ -1,6 +1,9 @@
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.exceptions import APIException
+from rest_framework import status
 
 from notification.models import OTPSMSToken
 from notification.services.otp import (
@@ -9,8 +12,10 @@ from notification.services.otp import (
 )
 from user.models import User
 
-class InactiveUserError(Exception):
-    pass
+class InactiveUserError(APIException):
+    status_code = status.HTTP_200_OK
+    default_detail = _("حساب کاربری غیرفعال است.")
+    default_code = "invalid_otp"
 
 @transaction.atomic
 def login_with_otp(
@@ -39,15 +44,9 @@ def login_with_otp(
                 "date_updated",
             ]
         )
-    if not user.is_mobile_verified:
-        raise InvalidOTPError
+
     refresh = RefreshToken.for_user(user)
     return {
-        'success': True,
-        'message': 'دریافت توکن با موفقیت انجام شد.',
-        'called_by': 'webapp',
-        'data' : {
-            'access': str(refresh.access_token),
-            'refresh': str(refresh)
-        }
+        'access': str(refresh.access_token),
+        'refresh': str(refresh)
     }

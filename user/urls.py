@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import LoginOTPRequestView, LoginOTPVerifyView
+from .views import LoginOTPRequestView, LoginOTPVerifyView, RefreshTokenView
 
 
 urlpatterns = [
@@ -13,5 +13,10 @@ urlpatterns = [
         "auth/login/verify-otp/",
         LoginOTPVerifyView.as_view(),
         name="login-verify-otp",
+    ),
+    path(
+    "auth/token/refresh/",
+        RefreshTokenView.as_view(),
+        name="token-refresh",
     ),
 ]
