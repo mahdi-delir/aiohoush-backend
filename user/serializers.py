@@ -78,11 +78,23 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
                 code="invalid_session",
             )
         data = super().validate(attrs)
-        session.last_used_at = timezone.now()
-        session.save(
-            update_fields=["last_used_at"]
-        )
+        if "refresh" in data:
+            new_refresh = self.token_class(
+                data["refresh"]
+            )
 
+            session.refresh_jti = new_refresh[
+                api_settings.JTI_CLAIM
+            ]
+
+        session.last_used_at = timezone.now()
+
+        session.save(
+            update_fields=[
+                "refresh_jti",
+                "last_used_at",
+            ]
+        )
         return data
 
 class LogoutSerializer(serializers.Serializer):
@@ -90,3 +102,30 @@ class LogoutSerializer(serializers.Serializer):
         write_only=True,
         trim_whitespace=False,
     )
+
+class AuthSessionSerializer(serializers.ModelSerializer):
+    is_current = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AuthSession
+        fields = (
+            "id",
+            "ip_address",
+            "browser_name",
+            "browser_version",
+            "os_name",
+            "os_version",
+            "device_type",
+            "device_brand",
+            "device_model",
+            "created_at",
+            "last_used_at",
+            "is_current",
+        )
+
+    def get_is_current(self, obj):
+        current_sid = self.context.get(
+            "current_sid"
+        )
+
+        return str(obj.id) == str(current_sid)

@@ -1,6 +1,14 @@
 from django.urls import path
 
-from .views import LoginOTPRequestView, LoginOTPVerifyView, RefreshTokenView, LogoutView, LogoutAllView
+from .views import (
+    LoginOTPRequestView,
+    LoginOTPVerifyView,
+    RefreshTokenView,
+    LogoutView,
+    LogoutAllView,
+    ActiveSessionsView,
+    RevokeSessionView,
+    )
 
 
 urlpatterns = [
@@ -28,5 +36,15 @@ urlpatterns = [
         "auth/logout-all/",
         LogoutAllView.as_view(),
         name="logout-all",
-        ),
+    ),
+    path(
+        "auth/sessions/",
+        ActiveSessionsView.as_view(),
+        name="active-sessions",
+    ),
+    path(
+        "auth/sessions/<uuid:session_id>/revoke/",
+        RevokeSessionView.as_view(),
+        name="revoke-session",
+    ),
 ]

@@ -35,6 +35,10 @@ class InvalidLogoutToken(APIException):
     default_detail = _("توکن خروج معتبر نیست.")
     default_code = "invalid_logout_token"
 
+class AuthSessionNotFound(APIException):
+    status_code = status.HTTP_200_OK
+    default_detail = _("نشست موردنظر یافت نشد.")
+    default_code = "session_not_found"
 
 
 @transaction.atomic
@@ -67,8 +71,7 @@ def login_with_otp(
         )
 
     refresh = RefreshToken.for_user(user)
-
-    session = create_auth_session(user=user, request=request)
+    session = create_auth_session(user=user, request=request, refresh_jti=refresh[api_settings.JTI_CLAIM])
     refresh['sid'] = str(session.id)
 
     return {
@@ -167,3 +170,48 @@ def logout_all_sessions(
             ],
             ignore_conflicts=True,
         )
+
+@transaction.atomic
+def revoke_other_session(
+    *,
+    user: User,
+    target_session_id: UUID,
+) -> None:
+
+    session = (
+        AuthSession.objects
+        .select_for_update()
+        .filter(
+            id=target_session_id,
+            user=user,
+            revoked_at__isnull=True,
+        )
+        .first()
+    )
+
+    if session is None:
+        raise AuthSessionNotFound
+
+    if session.refresh_jti:
+        outstanding_token = (
+            OutstandingToken.objects
+            .select_for_update()
+            .filter(
+                user=user,
+                jti=session.refresh_jti,
+            )
+            .first()
+        )
+
+        if outstanding_token is not None:
+            BlacklistedToken.objects.get_or_create(
+                token=outstanding_token
+            )
+
+    session.revoked_at = timezone.now()
+
+    session.save(
+        update_fields=[
+            "revoked_at",
+        ]
+    )

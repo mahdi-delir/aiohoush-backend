@@ -57,11 +57,13 @@ def create_auth_session(
     *,
     user: User,
     request: Request,
+    refresh_jti: str,
 ) -> AuthSession:
     client_info = get_client_info(request)
 
     session = AuthSession(
         user=user,
+        refresh_jti=refresh_jti,
         ip_address=client_info.ip_address,
         user_agent=client_info.user_agent,
         browser_name=client_info.browser_name,

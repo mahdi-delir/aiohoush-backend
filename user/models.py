@@ -217,6 +217,11 @@ class AuthSession(models.Model):
         related_name='auth_sessions',
         verbose_name=_('کاربر')
     )
+    refresh_jti = models.CharField(
+        max_length=255,
+        unique=True,
+        verbose_name=_("شناسه Refresh Token فعلی"),
+    )
     ip_address = models.GenericIPAddressField(
         null=True,
         blank=True,

@@ -1,4 +1,4 @@
-# user/api/views/auth.py
+from uuid import UUID
 
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
@@ -21,9 +21,15 @@ from .throttles import (
 
 from notification.services.otp import InvalidOTPError
 
-from .serializers import LoginOTPRequestSerializer, LoginOTPVerifySerializer, SessionTokenRefreshSerializer, LogoutSerializer
-from .models import User
-from .services.auth import login_with_otp, logout_session, logout_all_sessions
+from .serializers import (
+    LoginOTPRequestSerializer,
+    LoginOTPVerifySerializer,
+    SessionTokenRefreshSerializer,
+    LogoutSerializer,
+    AuthSessionSerializer
+    )
+from .models import User, AuthSession
+from .services.auth import login_with_otp, logout_session, logout_all_sessions, revoke_other_session
 
 class LoginOTPRequestView(APIView):
     authentication_classes = []
@@ -129,7 +135,6 @@ class RefreshTokenView(APIView):
             status=status.HTTP_200_OK,
         )
 
-
 class LogoutView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
@@ -170,4 +175,63 @@ class LogoutAllView(APIView):
             ),
             called_by='webapp',
             status=status.HTTP_200_OK,
+        )
+
+class ActiveSessionsView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request):
+        current_sid = request.auth.get("sid")
+
+        sessions = (
+            AuthSession.objects
+            .filter(
+                user=request.user,
+                revoked_at__isnull=True,
+            )
+            .order_by("-created_at")
+        )
+
+        serializer = AuthSessionSerializer(
+            sessions,
+            many=True,
+            context={
+                "current_sid": current_sid,
+            },
+        )
+
+        return APIResponse(
+            success=True,
+            message=_("نشست‌های فعال دریافت شدند."),
+            called_by='webapp',
+            data=serializer.data,
+        )
+
+class RevokeSessionView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def post(
+        self,
+        request,
+        session_id: UUID,
+    ):
+        current_sid = request.auth.get("sid")
+
+        revoke_other_session(
+            user=request.user,
+            current_session_id=current_sid,
+            target_session_id=session_id,
+        )
+
+        return APIResponse(
+            success=True,
+            called_by='webapp',
+            message=_(
+                "نشست موردنظر با موفقیت خاتمه یافت."
+            ),
+            data={}
         )
