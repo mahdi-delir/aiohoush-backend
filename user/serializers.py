@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 
-from rest_framework.serializers import Serializer
+from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import AuthenticationFailed
 
@@ -14,14 +14,14 @@ from .models import User, AuthSession
 mobile_model_field = User._meta.get_field("mobile")
 
 
-class LoginOTPRequestSerializer(Serializer):
+class LoginOTPRequestSerializer(serializers.Serializer):
     mobile = serializers.CharField(
         max_length=mobile_model_field.max_length,
         validators=list(mobile_model_field.validators),
         trim_whitespace=False,
     )
 
-class LoginOTPVerifySerializer(Serializer):
+class LoginOTPVerifySerializer(serializers.Serializer):
     mobile = serializers.CharField(
         max_length=mobile_model_field.max_length,
         validators=list(mobile_model_field.validators),
@@ -82,3 +82,9 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
         )
 
         return data
+
+class LogoutSerializer(serializers.Serializer):
+    refresh = serializers.CharField(
+        write_only=True,
+        trim_whitespace=False,
+    )

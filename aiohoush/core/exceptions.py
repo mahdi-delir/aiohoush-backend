@@ -24,3 +24,4 @@ def custom_exception_handler(exc, context):
         "detail": original_data,
     }
     return response
+

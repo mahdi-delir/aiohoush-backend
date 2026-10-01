@@ -1,10 +1,16 @@
+from uuid import UUID
+
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import APIException
 from rest_framework import status
 from rest_framework.request import Request
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from notification.models import OTPSMSToken
 from notification.services.otp import verify_otp
@@ -18,6 +24,14 @@ class InactiveUserError(APIException):
     status_code = status.HTTP_200_OK
     default_detail = _("حساب کاربری غیرفعال است.")
     default_code = "invalid_otp"
+
+
+class InvalidLogoutToken(APIException):
+    status_code = status.HTTP_200_OK
+    default_detail = _("توکن خروج معتبر نیست.")
+    default_code = "invalid_logout_token"
+
+
 
 @transaction.atomic
 def login_with_otp(
@@ -57,3 +71,45 @@ def login_with_otp(
         'access': str(refresh.access_token),
         'refresh': str(refresh)
     }
+
+@transaction.atomic
+def logout_session(
+    *,
+    raw_refresh: str,
+) -> None:
+    try:
+        refresh = RefreshToken(raw_refresh)
+    except TokenError as exc:
+        raise InvalidLogoutToken from exc
+
+    session_id = refresh.get("sid")
+    user_id = refresh.get(api_settings.USER_ID_CLAIM)
+
+    if not session_id or not user_id:
+        raise InvalidLogoutToken
+
+    try:
+        session_uuid = UUID(str(session_id))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise InvalidLogoutToken from exc
+
+    session = (
+        AuthSession.objects
+        .select_for_update()
+        .filter(
+            id=session_uuid,
+            user_id=user_id,
+            revoked_at__isnull=True,
+        )
+        .first()
+    )
+
+    if session is None:
+        raise InvalidLogoutToken
+
+    refresh.blacklist()
+
+    session.revoked_at = timezone.now()
+    session.save(
+        update_fields=["revoked_at"]
+    )

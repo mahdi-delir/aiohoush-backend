@@ -21,9 +21,9 @@ from .throttles import (
 
 from notification.services.otp import InvalidOTPError
 
-from .serializers import LoginOTPRequestSerializer, LoginOTPVerifySerializer, SessionTokenRefreshSerializer
+from .serializers import LoginOTPRequestSerializer, LoginOTPVerifySerializer, SessionTokenRefreshSerializer, LogoutSerializer
 from .models import User
-from .services.auth import InactiveUserError, login_with_otp
+from .services.auth import login_with_otp, logout_session
 
 class LoginOTPRequestView(APIView):
     authentication_classes = []
@@ -125,5 +125,27 @@ class RefreshTokenView(APIView):
             success=True,
             message=_("توکن با موفقیت بروزرسانی شد."),
             data=serializer.validated_data,
+            status=status.HTTP_200_OK,
+        )
+
+class LogoutView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = LogoutSerializer(
+            data=request.data
+        )
+        serializer.is_valid(
+            raise_exception=True
+        )
+
+        logout_session(
+            raw_refresh=serializer.validated_data["refresh"],
+        )
+
+        return APIResponse(
+            success=True,
+            message=_("خروج با موفقیت انجام شد."),
             status=status.HTTP_200_OK,
         )
