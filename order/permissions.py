@@ -64,6 +64,10 @@ class OrderManagementPermission(
             return user.has_perm(
                 "order.reject_order"
             )
+        if action == "sale_options":
+            return user.has_perm(
+                "order.add_order"
+            )
 
         return False
 

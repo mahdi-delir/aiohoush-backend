@@ -13,6 +13,8 @@ from aiohoush.core.responses import (
     APIResponse,
 )
 
+from course.models import Course
+
 from order.models import Order
 
 from .permissions import (
@@ -50,6 +52,9 @@ class OrderManagementViewSet(
                 "seller",
                 "created_by",
                 "checked_by",
+            )
+            .prefetch_related(
+                "requested_products__course",
             )
         )
 
@@ -198,4 +203,96 @@ class OrderManagementViewSet(
                 "سفارش رد شد."
             ),
             status=status.HTTP_200_OK,
+        )
+    @action(
+    detail=False,
+    methods=["get"],
+    url_path="options",
+    )
+    def sale_options(
+        self,
+        request,
+    ):
+        courses = (
+            Course.objects
+            .filter(
+                can_sale=True,
+            )
+            .order_by(
+                "order",
+                "id",
+            )
+            .values(
+                "id",
+                "title",
+                "price",
+            )
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message=(
+                "اطلاعات ثبت سفارش "
+                "با موفقیت دریافت شد."
+            ),
+            data={
+                "courses": list(courses),
+            },
+            status=status.HTTP_200_OK,
+        )
+    def list(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        queryset = self.filter_queryset(
+            self.get_queryset()
+        )
+
+        serializer = self.get_serializer(
+            queryset,
+            many=True,
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message=(
+                "سفارش‌ها با موفقیت "
+                "دریافت شدند."
+            ),
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+
+    def create(
+        self,
+        request,
+        *args,
+        **kwargs,
+    ):
+        serializer = self.get_serializer(
+            data=request.data,
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        self.perform_create(
+            serializer,
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message=(
+                "سفارش با موفقیت "
+                "ثبت شد."
+            ),
+            data=serializer.data,
+            status=status.HTTP_201_CREATED,
         )
