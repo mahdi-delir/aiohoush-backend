@@ -151,6 +151,14 @@ class Course(models.Model):
                 "view_teacher_sales_ranking",
                 "Can view teacher sales ranking",
             ),
+             (
+                "view_all_courses",
+                "Can view all courses",
+            ),
+            (
+                "change_any_course",
+                "Can change any course",
+            ),
         ]
 
 class CourseSeason(models.Model):
