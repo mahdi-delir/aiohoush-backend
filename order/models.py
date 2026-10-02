@@ -83,6 +83,25 @@ class Order(models.Model):
         auto_now=True,
         verbose_name = 'آخرین ویرایش'
     )
+    class Meta:
+        permissions = [
+            (
+                "approve_order",
+                "Can approve order",
+            ),
+            (
+                "reject_order",
+                "Can reject order",
+            ),
+            (
+                "view_own_sales_report",
+                "Can view own sales report",
+            ),
+            (
+                "view_own_sales_commission",
+                "Can view own sales commission",
+            ),
+        ]
 
 
 class RequestedProduct(models.Model):

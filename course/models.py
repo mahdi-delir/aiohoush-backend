@@ -133,6 +133,25 @@ class Course(models.Model):
 
     def __str__(self):
         return self.title
+    class Meta:
+        permissions = [
+            (
+                "publish_course",
+                "Can publish course",
+            ),
+            (
+                "view_own_course_sales",
+                "Can view own course sales",
+            ),
+            (
+                "view_own_course_commission",
+                "Can view own course commission",
+            ),
+            (
+                "view_teacher_sales_ranking",
+                "Can view teacher sales ranking",
+            ),
+        ]
 
 class CourseSeason(models.Model):
     title = models.CharField(
