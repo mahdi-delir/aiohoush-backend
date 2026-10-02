@@ -243,6 +243,7 @@ class RevokeSessionView(APIView):
             data={}
         )
 
+
 class MeView(APIView):
     permission_classes = (
         IsAuthenticated,
@@ -254,8 +255,8 @@ class MeView(APIView):
         data = {
             "user": {
                 "id": user.pk,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
                 "mobile": user.mobile,
             },
 
@@ -285,7 +286,8 @@ class MeView(APIView):
             success=True,
             message=(
                 "دریافت اطلاعات از سرور "
-                "با موفقیت انجام شد"
+                "با موفقیت انجام شد."
             ),
+            called_by='webapp',
             data=serializer.data,
         )
