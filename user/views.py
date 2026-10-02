@@ -26,10 +26,17 @@ from .serializers import (
     LoginOTPVerifySerializer,
     SessionTokenRefreshSerializer,
     LogoutSerializer,
-    AuthSessionSerializer
+    AuthSessionSerializer,
+    MeResponseSerializer
     )
 from .models import User, AuthSession
-from .services.auth import login_with_otp, logout_session, logout_all_sessions, revoke_other_session
+from .services.auth import (
+    login_with_otp,
+    logout_session,
+    logout_all_sessions,
+    revoke_other_session
+    )
+from .selectors.me import get_user_data
 
 class LoginOTPRequestView(APIView):
     authentication_classes = []
@@ -234,4 +241,51 @@ class RevokeSessionView(APIView):
                 "نشست موردنظر با موفقیت خاتمه یافت."
             ),
             data={}
+        )
+
+class MeView(APIView):
+    permission_classes = (
+        IsAuthenticated,
+    )
+
+    def get(self, request):
+        user = request.user
+
+        data = {
+            "user": {
+                "id": user.pk,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "mobile": user.mobile,
+            },
+
+            "groups": list(
+                user.groups
+                .order_by("name")
+                .values_list(
+                    "name",
+                    flat=True,
+                )
+            ),
+
+            "permissions": sorted(
+                user.get_all_permissions()
+            ),
+
+            "user_data": get_user_data(
+                user=user,
+            ),
+        }
+
+        serializer = MeResponseSerializer(
+            instance=data,
+        )
+
+        return APIResponse(
+            success=True,
+            message=(
+                "دریافت اطلاعات از سرور "
+                "با موفقیت انجام شد"
+            ),
+            data=serializer.data,
         )

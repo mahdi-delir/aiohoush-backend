@@ -40,6 +40,9 @@ INSTALLED_APPS = [
 
     'user',
     'course',
+    'notification',
+    'order',
+    'accounting',
 ]
 
 MIDDLEWARE = [
@@ -158,7 +161,7 @@ CACHES = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "core.session_jwt_auth.SessionJWTAuthentication",
+        "aiohoush.core.session_jwt_auth.SessionJWTAuthentication",
     ),
 
     "DEFAULT_PERMISSION_CLASSES": (
@@ -166,7 +169,7 @@ REST_FRAMEWORK = {
     ),
 
     "EXCEPTION_HANDLER": (
-        "core.exceptions.custom_exception_handler"
+        "aiohoush.core.exceptions.custom_exception_handler"
     ),
 
      "DEFAULT_THROTTLE_RATES": {
@@ -200,7 +203,8 @@ OTP_EXPIRATION_SECONDS = env.int("OTP_EXPIRATION_SECONDS")
 
 OTP_REQUEST_LIMIT_24H = env.int(
     "OTP_REQUEST_LIMIT_24H")
-
+OTP_LENGTH=env.int('OTP_LENGTH')
+CELERY_BROKER_URL = env("CELERY_BROKER_URL")
 PAYAMRESAN_API_URL = env("PAYAMRESAN_API_URL")
 PAYAMRESAN_API_KEY = env("PAYAMRESAN_API_KEY")
 PAYAMRESAN_SENDER = env("PAYAMRESAN_SENDER")

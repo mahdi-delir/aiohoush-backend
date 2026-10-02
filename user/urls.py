@@ -8,43 +8,49 @@ from .views import (
     LogoutAllView,
     ActiveSessionsView,
     RevokeSessionView,
+    MeView
     )
 
 
 urlpatterns = [
     path(
-        "auth/request-otp/",
+        "login/request-otp/",
         LoginOTPRequestView.as_view(),
         name="login-request-otp",
     ),
     path(
-        "auth/login/verify-otp/",
+        "login/verify-otp/",
         LoginOTPVerifyView.as_view(),
         name="login-verify-otp",
     ),
     path(
-    "auth/token/refresh/",
+    "token/refresh/",
         RefreshTokenView.as_view(),
         name="token-refresh",
     ),
     path(
-        "auth/logout/",
+        "logout/",
         LogoutView.as_view(),
         name="logout",
     ),
     path(
-        "auth/logout-all/",
+        "logout-all/",
         LogoutAllView.as_view(),
         name="logout-all",
     ),
     path(
-        "auth/sessions/",
+        "sessions/",
         ActiveSessionsView.as_view(),
         name="active-sessions",
     ),
     path(
-        "auth/sessions/<uuid:session_id>/revoke/",
+        "sessions/<uuid:session_id>/revoke/",
         RevokeSessionView.as_view(),
         name="revoke-session",
+    ),
+    path(
+        "me/",
+        MeView.as_view(),
+        name="auth-me",
     ),
 ]

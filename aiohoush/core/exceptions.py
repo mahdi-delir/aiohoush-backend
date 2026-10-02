@@ -5,11 +5,7 @@ from django.utils.translation import gettext_lazy as _
 def custom_exception_handler(exc, context):
     response = exception_handler(exc, context)
     if response is None:
-        return {
-            'success': False,
-            'message': _('The response is None'),
-            'called_by': 'webapp'
-        }
+        return None
     original_data = response.data
     message = _("درخواست نامعتبر است.")
     if (
@@ -24,4 +20,3 @@ def custom_exception_handler(exc, context):
         "detail": original_data,
     }
     return response
-

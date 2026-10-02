@@ -129,3 +129,38 @@ class AuthSessionSerializer(serializers.ModelSerializer):
         )
 
         return str(obj.id) == str(current_sid)
+
+class CurrentUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    mobile = serializers.CharField()
+
+class ActiveCourseSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    all_sessions = serializers.IntegerField()
+    current_session = serializers.IntegerField()
+    completed_percent = serializers.FloatField()
+
+class UserDataSerializer(serializers.Serializer):
+    watched_gift = serializers.BooleanField(
+        required=False,
+    )
+    has_course = serializers.BooleanField(
+        required=False,
+    )
+    active_courses = ActiveCourseSerializer(
+        many=True,
+        required=False,
+    )
+
+class MeResponseSerializer(serializers.Serializer):
+    user = CurrentUserSerializer()
+    groups = serializers.ListField(
+        child=serializers.CharField(),
+    )
+    permissions = serializers.ListField(
+        child=serializers.CharField(),
+    )
+    user_data = UserDataSerializer()

@@ -83,9 +83,9 @@ def verify_otp(
         reason = reason
     ).order_by('-created_at').first()
     if otp is None:
-        raise ValueError(_('کد یکبارمصرف معتبر نیست.'))
+        raise InvalidOTPError
     if not check_password(raw_code, otp.code_hash):
-        raise ValueError(_('کد یکبارمصرف معتبر نیست.'))
+        raise InvalidOTPError
     otp.consumed_at = now
     otp.save(update_fields=['consumed_at'])
     return otp

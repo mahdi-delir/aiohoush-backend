@@ -31,7 +31,7 @@ class SMSServerResponse(models.Model):
         verbose_name=_("دریافت کننده"),
     )
 
-    trace_id = models.PositiveBigIntegerField(
+    trace_id = models.BigAutoField(
         primary_key=True,
         verbose_name=_("کد پیگیری"),
     )
