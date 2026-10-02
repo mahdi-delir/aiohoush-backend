@@ -159,6 +159,10 @@ class Course(models.Model):
                 "change_any_course",
                 "Can change any course",
             ),
+            (
+                "view_own_courses",
+                "Can view own courses",
+            ),
         ]
 
 class CourseSeason(models.Model):

@@ -32,6 +32,7 @@ GROUP_PERMISSIONS = {
         "course.view_own_course_sales",
         "course.view_own_course_commission",
         "course.view_teacher_sales_ranking",
+        "course.view_own_courses",
     ],
 
     "دانشجویان": [
@@ -82,6 +83,8 @@ GROUP_PERMISSIONS = {
         "course.change_coursesession",
         "course.view_coursesession",
 
+        "course.view_all_courses",
+        "course.change_any_course",
         "course.view_all_courses",
         "course.change_any_course",
 
