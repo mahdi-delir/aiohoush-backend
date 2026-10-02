@@ -87,6 +87,8 @@ GROUP_PERMISSIONS = {
         "course.change_any_course",
         "course.view_all_courses",
         "course.change_any_course",
+        "order.view_all_orders",
+        "order.change_any_order",
 
         # Orders
         "order.add_order",
@@ -121,6 +123,9 @@ GROUP_PERMISSIONS = {
         "accounting.view_payment",
         "accounting.add_payment",
         "accounting.change_payment",
+        "order.view_all_orders",
+        "order.approve_order",
+        "order.reject_order",
     ],
 
     # مدل‌های call/import هنوز ساخته نشده‌اند.

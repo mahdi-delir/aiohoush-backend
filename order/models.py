@@ -101,6 +101,14 @@ class Order(models.Model):
                 "view_own_sales_commission",
                 "Can view own sales commission",
             ),
+             (
+                "view_all_orders",
+                "Can view all orders",
+            ),
+            (
+                "change_any_order",
+                "Can change any order",
+            ),
         ]
 
 
