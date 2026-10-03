@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 @shared_task(
     bind=True,
-    soft_time_limit=10,
-    time_limit=15,
+    soft_time_limit=30,
+    time_limit=45,
     ignore_result=True,
 )
 def enrich_auth_session(
