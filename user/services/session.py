@@ -8,7 +8,7 @@ from rest_framework.request import Request
 
 from user.models import AuthSession, User
 from user.tasks import enrich_auth_session
-
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -60,16 +60,29 @@ def create_auth_session(
     session.save()
 
     # تحلیل دستگاه بعد از ایجاد نشست انجام می‌شود
-    try:
-        enrich_auth_session.delay(
-            session_id=str(session.id),
-            user_agent=client_info.user_agent,
+    def enqueue_device_detection(
+        *,
+        session_id: str,
+        user_agent: str,
+    ) -> None:
+        try:
+            enrich_auth_session.delay(
+                session_id=session_id,
+                user_agent=user_agent,
+            )
+        except Exception:
+            logger.exception(
+                "Could not enqueue device detection for session %s",
+                session_id,
+            )
+
+
+    transaction.on_commit(
+        lambda session_id=str(session.id),
+        user_agent=client_info.user_agent: enqueue_device_detection(
+            session_id=session_id,
+            user_agent=user_agent,
         )
-    except Exception:
-        # خراب‌بودن Celery نباید باعث شکست ورود کاربر شود
-        logger.exception(
-            "Could not enqueue device detection for session %s",
-            session.id,
-        )
+    )
 
     return session
