@@ -8,8 +8,9 @@ from .views import (
     CourseManagementViewSet,
     CourseCatalogView,
     CourseCatalogCategoryView,
-    HomeworkSubmissionView
-
+    CourseDetailView,
+    HomeworkSubmissionView,
+    MyCourseHomeworkView,
 )
 
 
@@ -38,5 +39,15 @@ urlpatterns += [
         "sessions/<int:session_id>/homework/",
         HomeworkSubmissionView.as_view(),
         name="session-homework",
+    ),
+    path(
+        "catalog/<slug:slug>/",
+        CourseDetailView.as_view(),
+        name="course-detail",
+    ),
+    path(
+        "homework/mine/",
+        MyCourseHomeworkView.as_view(),
+        name="my-course-homework",
     ),
 ]

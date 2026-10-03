@@ -18,9 +18,15 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from aiohoush.core.responses import APIResponse
-from course.models import Course, CourseCategory, CourseSessionHomeworkSubmission
+from course.models import Course, CourseCategory, CourseSessionHomeworkSubmission, CourseSession
 from .permissions import CourseManagementPermission
-from .serializers import CourseSerializer, CourseCatalogCategorySerializer, CourseCatalogSerializer, HomeworkSubmissionSerializer
+from .serializers import (
+    CourseSerializer,
+    CourseCatalogCategorySerializer,
+    CourseCatalogSerializer,
+    CourseDetailSerializer,
+    HomeworkSubmissionSerializer,
+)
 from order.models import Order, RequestedProduct
 
 class CourseManagementViewSet(
@@ -412,4 +418,120 @@ class HomeworkSubmissionView(
                 else status.HTTP_200_OK
             ),
         )
-    
+
+class CourseDetailView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request, slug):
+        user = request.user
+
+        access = (
+            RequestedProduct.objects
+            .filter(
+                course_id=OuterRef("pk"),
+                order__student=user,
+                order__status=Order.STATUS.APPROVED,
+                order__is_deleted=False,
+            )
+        )
+
+        queryset = (
+            Course.objects
+            .annotate(
+                has_access=Exists(access),
+                all_sessions=Count(
+                    "seasons__sessions",
+                    distinct=True,
+                ),
+                season_count=Count(
+                    "seasons",
+                    distinct=True,
+                ),
+                completed_sessions=Count(
+                    "seasons__sessions__user_progresses",
+                    filter=Q(
+                        seasons__sessions__user_progresses__user=user,
+                        seasons__sessions__user_progresses__completed_at__isnull=False,
+                    ),
+                    distinct=True,
+                ),
+                total_duration=Sum(
+                    "seasons__sessions__duration",
+                ),
+            )
+            .prefetch_related(
+                "categories",
+                "seasons__sessions",
+            )
+        )
+
+        course = get_object_or_404(
+            queryset,
+            slug=slug,
+        )
+
+        if not course.has_access and not (
+            course.is_published and course.can_sale
+        ):
+            raise PermissionDenied(
+                "به این دوره دسترسی ندارید."
+            )
+
+        serializer = CourseDetailSerializer(
+            course,
+            context={
+                "request": request,
+            },
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="اطلاعات دوره با موفقیت دریافت شد.",
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+class MyCourseHomeworkView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request):
+        course_id = request.query_params.get("course")
+
+        if not course_id:
+            raise ValidationError(
+                "شناسه دوره الزامی است."
+            )
+
+        submissions = (
+            CourseSessionHomeworkSubmission.objects
+            .filter(
+                student=request.user,
+                session__season__course_id=course_id,
+            )
+            .select_related(
+                "session",
+                "session__season",
+            )
+            .order_by("-submitted_at")
+        )
+
+        serializer = HomeworkSubmissionSerializer(
+            submissions,
+            many=True,
+            context={
+                "request": request,
+            },
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="تمرین‌های دوره با موفقیت دریافت شدند.",
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
