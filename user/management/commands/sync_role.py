@@ -28,6 +28,8 @@ GROUP_PERMISSIONS = {
         # Student progress
         "course.view_coursesessionprogress",
 
+        "course.review_homework_submission",
+
         # Custom
         "course.view_own_course_sales",
         "course.view_own_course_commission",
@@ -82,6 +84,8 @@ GROUP_PERMISSIONS = {
         "course.add_coursesession",
         "course.change_coursesession",
         "course.view_coursesession",
+
+        "course.review_homework_submission",
 
         "course.view_all_courses",
         "course.change_any_course",
