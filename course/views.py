@@ -6,22 +6,22 @@ from django.db.models import (
     Q,
     Sum,
 )
+from django.db import transaction
+from django.shortcuts import get_object_or_404
 
 from rest_framework import mixins, status
 from rest_framework.decorators import action
 from rest_framework.viewsets import GenericViewSet
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from aiohoush.core.responses import APIResponse
-from course.models import Course, CourseCategory
+from course.models import Course, CourseCategory, CourseSessionHomeworkSubmission
 from .permissions import CourseManagementPermission
-from .serializers import CourseSerializer, CourseCatalogCategorySerializer, CourseCatalogSerializer
-from order.models import (
-    Order,
-    RequestedProduct,
-)
-
+from .serializers import CourseSerializer, CourseCatalogCategorySerializer, CourseCatalogSerializer, HomeworkSubmissionSerializer
+from order.models import Order, RequestedProduct
 
 class CourseManagementViewSet(
     mixins.ListModelMixin,
@@ -229,3 +229,187 @@ class CourseCatalogCategoryView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+class HomeworkSubmissionView(
+    APIView
+):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    parser_classes = [
+        JSONParser,
+        FormParser,
+        MultiPartParser,
+    ]
+
+    def get_session(
+        self,
+        request,
+        session_id,
+    ):
+        session = get_object_or_404(
+            CourseSession.objects
+            .select_related(
+                "season__course",
+            ),
+            pk=session_id,
+        )
+
+        if not session.has_homework:
+            raise ValidationError(
+                "این جلسه تمرین ندارد."
+            )
+
+        has_access = (
+            RequestedProduct.objects
+            .filter(
+                course=session.season.course,
+                order__student=request.user,
+                order__status=(
+                    Order.STATUS.APPROVED
+                ),
+                order__is_deleted=False,
+            )
+            .exists()
+        )
+
+        if not has_access:
+            raise PermissionDenied(
+                "به این دوره دسترسی ندارید."
+            )
+
+        return session
+
+    def get(
+        self,
+        request,
+        session_id,
+    ):
+        session = self.get_session(
+            request,
+            session_id,
+        )
+
+        submission = (
+            CourseSessionHomeworkSubmission
+            .objects
+            .filter(
+                session=session,
+                student=request.user,
+            )
+            .first()
+        )
+
+        if submission is None:
+            return APIResponse(
+                success=True,
+                called_by="webapp",
+                message=(
+                    "هنوز تمرینی ارسال "
+                    "نشده است."
+                ),
+                data=None,
+                status=status.HTTP_200_OK,
+            )
+
+        serializer = (
+            HomeworkSubmissionSerializer(
+                submission,
+                context={
+                    "request": request,
+                },
+            )
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message=(
+                "تمرین با موفقیت "
+                "دریافت شد."
+            ),
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+    @transaction.atomic
+    def post(
+        self,
+        request,
+        session_id,
+    ):
+        session = self.get_session(
+            request,
+            session_id,
+        )
+
+        submission = (
+            CourseSessionHomeworkSubmission
+            .objects
+            .select_for_update()
+            .filter(
+                session=session,
+                student=request.user,
+            )
+            .first()
+        )
+
+        if (
+            submission
+            and submission.status
+            == CourseSessionHomeworkSubmission
+            .STATUS.REVIEWED
+        ):
+            raise ValidationError(
+                "این تمرین بررسی شده و "
+                "دیگر قابل ویرایش نیست."
+            )
+
+        serializer = (
+            HomeworkSubmissionSerializer(
+                instance=submission,
+                data=request.data,
+                context={
+                    "request": request,
+                },
+            )
+        )
+
+        serializer.is_valid(
+            raise_exception=True,
+        )
+
+        created = submission is None
+
+        submission = serializer.save(
+            session=session,
+            student=request.user,
+            status=(
+                CourseSessionHomeworkSubmission
+                .STATUS.SUBMITTED
+            ),
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message=(
+                "تمرین با موفقیت "
+                "ارسال شد."
+            ),
+            data=(
+                HomeworkSubmissionSerializer(
+                    submission,
+                    context={
+                        "request": request,
+                    },
+                ).data
+            ),
+            status=(
+                status.HTTP_201_CREATED
+                if created
+                else status.HTTP_200_OK
+            ),
+        )
+    

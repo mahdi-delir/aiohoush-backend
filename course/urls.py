@@ -7,7 +7,8 @@ from rest_framework.routers import (
 from .views import (
     CourseManagementViewSet,
     CourseCatalogView,
-    CourseCatalogCategoryView
+    CourseCatalogCategoryView,
+    HomeworkSubmissionView
 
 )
 
@@ -32,5 +33,10 @@ urlpatterns += [
         "catalog/categories/",
         CourseCatalogCategoryView.as_view(),
         name="course-catalog-categories",
+    ),
+    path(
+        "sessions/<int:session_id>/homework/",
+        HomeworkSubmissionView.as_view(),
+        name="session-homework",
     ),
 ]

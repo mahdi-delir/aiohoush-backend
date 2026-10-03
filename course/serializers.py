@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from course.models import Course
 
-from course.models import Course, CourseCategory
+from course.models import Course, CourseCategory, CourseSessionHomeworkSubmission
 class CourseSerializer(
     serializers.ModelSerializer
 ):
@@ -45,7 +45,6 @@ class CourseCatalogCategorySerializer(
             "title",
             "slug",
         ]
-
 
 class CourseCatalogSerializer(
     serializers.ModelSerializer
@@ -154,3 +153,54 @@ class CourseCatalogSerializer(
             for category
             in obj.categories.all()
         ]
+
+
+
+class HomeworkSubmissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = (
+            CourseSessionHomeworkSubmission
+        )
+
+        fields = [
+            "id",
+            "session",
+            "answer",
+            "attachment",
+            "status",
+            "feedback",
+            "submitted_at",
+            "updated_at",
+            "reviewed_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "session",
+            "status",
+            "feedback",
+            "submitted_at",
+            "updated_at",
+            "reviewed_at",
+        ]
+
+    def validate(self, attrs):
+        answer = attrs.get(
+            "answer",
+            "",
+        )
+
+        attachment = attrs.get(
+            "attachment",
+        )
+
+        if (
+            not answer.strip()
+            and not attachment
+        ):
+            raise serializers.ValidationError(
+                "متن تمرین یا فایل تمرین "
+                "باید ارسال شود."
+            )
+
+        return attrs
