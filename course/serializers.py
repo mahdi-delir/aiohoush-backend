@@ -7,6 +7,7 @@ from course.models import (
     CourseSeason,
     CourseSession,
     CourseSessionHomeworkSubmission,
+    GiftVideo,
 )
 def format_duration(value):
     if not value:
@@ -196,7 +197,6 @@ class CourseDetailInfoSerializer(
             for category in obj.categories.all()
         ]
 
-
 class CourseDetailSerializer(
     serializers.ModelSerializer
 ):
@@ -219,6 +219,7 @@ class CourseDetailSerializer(
             obj,
             context=self.context,
         ).data
+
 class CourseSerializer(
     serializers.ModelSerializer
 ):
@@ -248,7 +249,6 @@ class CourseSerializer(
             "is_published",
             "published_at",
         ]
-
 
 class CourseCatalogCategorySerializer(
     serializers.ModelSerializer
@@ -370,8 +370,6 @@ class CourseCatalogSerializer(
             in obj.categories.all()
         ]
 
-
-
 class HomeworkSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = (
@@ -420,3 +418,32 @@ class HomeworkSubmissionSerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+class GiftVideoSerializer(
+    serializers.ModelSerializer
+):
+    playerUrl = serializers.CharField(
+        source="player_url",
+        allow_blank=True,
+        allow_null=True,
+        read_only=True,
+    )
+
+    duration = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GiftVideo
+
+        fields = [
+            "id",
+            "title",
+            "slug",
+            "duration",
+            "playerUrl",
+            "cover",
+            "order",
+            "is_public",
+        ]
+
+    def get_duration(self, obj):
+        return format_duration(obj.duration)

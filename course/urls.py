@@ -11,6 +11,8 @@ from .views import (
     CourseDetailView,
     HomeworkSubmissionView,
     MyCourseHomeworkView,
+    GiftVideoListView,
+    GiftVideoDetailView,
 )
 
 
@@ -49,5 +51,16 @@ urlpatterns += [
         "homework/mine/",
         MyCourseHomeworkView.as_view(),
         name="my-course-homework",
+    ),
+    path(
+        "gift-videos/",
+        GiftVideoListView.as_view(),
+        name="gift-video-list",
+    ),
+
+    path(
+        "gift-videos/<slug:slug>/",
+        GiftVideoDetailView.as_view(),
+        name="gift-video-detail",
     ),
 ]

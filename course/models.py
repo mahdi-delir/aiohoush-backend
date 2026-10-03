@@ -1,8 +1,62 @@
 import uuid
+
+from pathlib import Path
+
+from datetime import timedelta
+
 from django.db import models
 from django.conf import settings
 
-# Create your models here.
+
+def homework_submission_upload_to(
+    instance,
+    filename,
+):
+    filename = Path(filename).name
+
+    return (
+        "homework_submissions/"
+        f"{instance.student.mobile}/"
+        f"{instance.session_id}/"
+        f"{uuid.uuid4().hex}_{filename}"
+    )
+
+def course_poster_upload_to(
+    instance,
+    filename,
+):
+    filename = Path(filename).name
+
+    return (
+        "posters/course/"
+        f"{instance.slug}/"
+        f"{uuid.uuid4().hex}_{filename}"
+    )
+
+def session_poster_upload_to(
+    instance,
+    filename,
+):
+    filename = Path(filename).name
+
+    return (
+        "posters/session/"
+        f"{instance.season.course.slug}/"
+        f"{instance.season_id}/"
+        f"{uuid.uuid4().hex}_{filename}"
+    )
+
+def gift_poster_upload_to(
+    instance,
+    filename,
+):
+    filename = Path(filename).name
+
+    return (
+        "posters/gift/"
+        f"{instance.slug}/"
+        f"{uuid.uuid4().hex}_{filename}"
+    )
 
 class CourseCategory(models.Model):
     title = models.CharField(
@@ -111,7 +165,7 @@ class Course(models.Model):
         verbose_name='عکس شاخص',
         blank = True,
         null=True,
-        upload_to='course-posters/'
+        upload_to=course_poster_upload_to
     )
 
     intro_video = models.CharField(
@@ -243,7 +297,7 @@ class CourseSession(models.Model):
         verbose_name = 'عکس شاخص',
         blank = True,
         null = True,
-        upload_to='course-session-posters/'
+        upload_to=session_poster_upload_to
     )
 
     source_code = models.FileField(
@@ -582,27 +636,6 @@ class CourseSessionWatchedRange(models.Model):
             ),
         ]
 
-from pathlib import Path
-from uuid import uuid4
-
-from django.conf import settings
-from django.db import models
-
-
-def homework_submission_upload_to(
-    instance,
-    filename,
-):
-    filename = Path(filename).name
-
-    return (
-        "homework_submissions/"
-        f"{instance.student.mobile}/"
-        f"{instance.session_id}/"
-        f"{uuid4().hex}_{filename}"
-    )
-
-
 class CourseSessionHomeworkSubmission(models.Model):
     class STATUS(models.TextChoices):
         SUBMITTED = "submitted", "ارسال شده"
@@ -626,9 +659,7 @@ class CourseSessionHomeworkSubmission(models.Model):
     )
 
     attachment = models.FileField(
-        upload_to=(
-            homework_submission_upload_to
-        ),
+        upload_to=homework_submission_upload_to,
         blank=True,
         null=True,
     )
@@ -695,3 +726,66 @@ class CourseSessionHomeworkSubmission(models.Model):
             f"{self.student_id} - "
             f"{self.session_id}"
         )
+
+class GiftVideo(models.Model):
+    title = models.CharField(
+        max_length=255,
+        verbose_name = 'عنوان'
+    )
+
+    slug = models.SlugField(
+        max_length=255,
+        unique=True,
+        verbose_name = 'اسلاگ'
+    )
+
+    player_url = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name = 'آدرس پلیر'
+    )
+
+    cover = models.ImageField(
+        upload_to=gift_poster_upload_to,
+        null = True,
+        blank=True,
+        verbose_name = 'کاور'
+    )
+
+    duration = models.DurationField(
+        default = timedelta,
+        verbose_name = 'مدت زمان'
+    )
+
+    order = models.PositiveIntegerField(
+        default=0,
+        verbose_name = 'ترتیب'
+    )
+
+    is_public = models.BooleanField(
+        default=True,
+        verbose_name='عمومی'
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name = 'فعال؟'
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='تاریخ ایجاد'
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='تاریخ به روز رسانی'
+    )
+
+    class Meta:
+        ordering = ["order", "-created_at"]
+
+    def __str__(self):
+        return self.title
+

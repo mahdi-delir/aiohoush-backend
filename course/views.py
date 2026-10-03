@@ -18,7 +18,7 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from aiohoush.core.responses import APIResponse
-from course.models import Course, CourseCategory, CourseSessionHomeworkSubmission, CourseSession
+from .models import Course, CourseCategory, CourseSessionHomeworkSubmission, CourseSession, GiftVideo
 from .permissions import CourseManagementPermission
 from .serializers import (
     CourseSerializer,
@@ -26,6 +26,7 @@ from .serializers import (
     CourseCatalogSerializer,
     CourseDetailSerializer,
     HomeworkSubmissionSerializer,
+    GiftVideoSerializer,
 )
 from order.models import Order, RequestedProduct
 
@@ -532,6 +533,71 @@ class MyCourseHomeworkView(APIView):
             success=True,
             called_by="webapp",
             message="تمرین‌های دوره با موفقیت دریافت شدند.",
+            data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+class GiftVideoListView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request):
+        videos = (
+            GiftVideo.objects
+            .filter(
+                is_active=True,
+                is_public=True,
+            )
+            .order_by(
+                "order",
+                "id",
+            )
+        )
+
+        serializer = GiftVideoSerializer(
+            videos,
+            many=True,
+            context={
+                "request": request,
+            },
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="ویدئوهای هدیه با موفقیت دریافت شدند.",
+            data={
+                "videos": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class GiftVideoDetailView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request, slug):
+        video = get_object_or_404(
+            GiftVideo.objects.filter(
+                is_active=True,
+                is_public=True,
+            ),
+            slug=slug,
+        )
+
+        serializer = GiftVideoSerializer(
+            video,
+            context={
+                "request": request,
+            },
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="ویدئوی هدیه با موفقیت دریافت شد.",
             data=serializer.data,
             status=status.HTTP_200_OK,
         )

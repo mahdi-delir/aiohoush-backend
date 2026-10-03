@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from course.models import (
+from .models import (
     Course,
     CourseCategory,
     CourseSeason,
@@ -9,6 +9,7 @@ from course.models import (
     CourseSessionWatch,
     CourseSessionWatchEvent,
     CourseSessionWatchedRange,
+    GiftVideo,
 )
 
 
@@ -32,7 +33,6 @@ class CourseCategoryAdmin(admin.ModelAdmin):
         "id",
     )
 
-
 class CourseSeasonInline(admin.TabularInline):
     model = CourseSeason
     extra = 0
@@ -45,7 +45,6 @@ class CourseSeasonInline(admin.TabularInline):
     ordering = (
         "order",
     )
-
 
 @admin.register(Course)
 class CourseAdmin(admin.ModelAdmin):
@@ -91,7 +90,6 @@ class CourseAdmin(admin.ModelAdmin):
         CourseSeasonInline,
     )
 
-
 class CourseSessionInline(admin.TabularInline):
     model = CourseSession
     extra = 0
@@ -107,7 +105,6 @@ class CourseSessionInline(admin.TabularInline):
     ordering = (
         "order",
     )
-
 
 @admin.register(CourseSeason)
 class CourseSeasonAdmin(admin.ModelAdmin):
@@ -140,7 +137,6 @@ class CourseSeasonAdmin(admin.ModelAdmin):
     inlines = (
         CourseSessionInline,
     )
-
 
 @admin.register(CourseSession)
 class CourseSessionAdmin(admin.ModelAdmin):
@@ -186,7 +182,6 @@ class CourseSessionAdmin(admin.ModelAdmin):
     def get_course(self, obj):
         return obj.season.course
 
-
 @admin.register(CourseSessionProgress)
 class CourseSessionProgressAdmin(admin.ModelAdmin):
     list_display = (
@@ -228,7 +223,6 @@ class CourseSessionProgressAdmin(admin.ModelAdmin):
     def get_course(self, obj):
         return obj.session.season.course
 
-
 class CourseSessionWatchEventInline(admin.TabularInline):
     model = CourseSessionWatchEvent
     extra = 0
@@ -251,7 +245,6 @@ class CourseSessionWatchEventInline(admin.TabularInline):
     ordering = (
         "sequence",
     )
-
 
 @admin.register(CourseSessionWatch)
 class CourseSessionWatchAdmin(admin.ModelAdmin):
@@ -286,7 +279,6 @@ class CourseSessionWatchAdmin(admin.ModelAdmin):
         CourseSessionWatchEventInline,
     )
 
-
 @admin.register(CourseSessionWatchEvent)
 class CourseSessionWatchEventAdmin(admin.ModelAdmin):
     list_display = (
@@ -316,7 +308,6 @@ class CourseSessionWatchEventAdmin(admin.ModelAdmin):
         "-created_at",
     )
 
-
 @admin.register(CourseSessionWatchedRange)
 class CourseSessionWatchedRangeAdmin(admin.ModelAdmin):
     list_display = (
@@ -337,3 +328,36 @@ class CourseSessionWatchedRangeAdmin(admin.ModelAdmin):
         "progress",
         "start_ms",
     )
+
+@admin.register(GiftVideo)
+class GiftVideoAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "title",
+        "slug",
+        "order",
+        "is_public",
+        "is_active",
+        "duration",
+    )
+
+    list_filter = (
+        "is_public",
+        "is_active",
+    )
+
+    search_fields = (
+        "title",
+        "slug",
+    )
+
+    ordering = (
+        "order",
+        "id",
+    )
+
+    prepopulated_fields = {
+        "slug": (
+            "title",
+        ),
+    }

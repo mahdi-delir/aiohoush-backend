@@ -10,7 +10,7 @@ from rest_framework.views import APIView
 from aiohoush.core.responses import APIResponse
 
 from notification.models import OTPSMSToken
-from notification.tasks import send_otp_sms
+from notification.tasks import send_otp_sms, send_welcome_sms
 
 from .throttles import (
     OTPIPRateThrottle,
@@ -66,6 +66,9 @@ class LoginOTPRequestView(APIView):
             user.full_clean()
             user.save(
                 update_fields=["password"]
+            )
+            send_welcome_sms.delay_on_commit(
+                user_id=user.pk,
             )
 
         send_otp_sms.delay_on_commit(
@@ -242,7 +245,6 @@ class RevokeSessionView(APIView):
             ),
             data={}
         )
-
 
 class MeView(APIView):
     permission_classes = (

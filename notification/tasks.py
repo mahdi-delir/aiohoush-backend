@@ -72,3 +72,43 @@ def send_otp_sms(
             result.trace_ids,
             result.status,
         )
+
+@shared_task(ignore_result=True)
+def send_welcome_sms(
+    *,
+    user_id: int,
+) -> None:
+    try:
+        user = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        logger.warning(
+            _("Welcome SMS task skipped because user does not exist. user_id=%s"),
+            user_id,
+        )
+        return
+
+    text = f'به آیوهوش خوش آمدید!\nحساب کاربری شما با موفقیت در آیوهوش ایجاد شد.\nآیوهوش برترین پلتفرم آموزش برنامه نویسی و هوش مصنوعی.\nhttps://aiohoush.com'
+
+    outgoing_message = OutgoingSMS(
+        recipient=user.mobile,
+        text=text,
+    )
+
+    prepared_messages = prepare_sms_messages(
+        messages=[outgoing_message],
+    )
+
+    results = send_sms_requests(
+        messages=prepared_messages,
+    )
+
+    result = results[0]
+
+    if result.status != SMSServerResponse.SMSSTATUS.SENT:
+        logger.warning(
+            _("Welcome SMS sending did not succeed. user_id=%s user=%s trace_ids=%s status=%s"),
+            user.pk,
+            user,
+            result.trace_ids,
+            result.status,
+        )
