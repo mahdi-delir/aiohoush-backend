@@ -9,13 +9,10 @@ from rest_framework.viewsets import (
     GenericViewSet,
 )
 
-from aiohoush.core.responses import (
-    APIResponse,
-)
 
 from course.models import Course
 
-from order.models import Order
+from .models import Order, AIProductOrder
 
 from .permissions import (
     OrderManagementPermission,
@@ -23,6 +20,15 @@ from .permissions import (
 from .serializers import (
     OrderSerializer,
 )
+import requests
+
+from django.conf import settings
+
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
+
+from aiohoush.core.responses import APIResponse
 
 
 class OrderManagementViewSet(
@@ -342,4 +348,127 @@ class OrderManagementViewSet(
             ),
             data=serializer.data,
             status=status.HTTP_200_OK,
+        )
+
+AI_PRODUCTS = {
+    "chatgpt-monthly": {
+        "title": "اکانت ChatGPT ماهانه",
+        "amount_rial": 55_000_000,
+    },
+    "claude-monthly": {
+        "title": "اکانت Claude ماهانه",
+        "amount_rial": 90_000_000,
+    },
+    "pixverse-monthly": {
+        "title": "اکانت PixVerse ماهانه",
+        "amount_rial": 140_000_000,
+    },
+    "higgsfield-monthly": {
+        "title": "اکانت Higgsfield ماهانه",
+        "amount_rial": 60_000_000,
+    },
+}
+
+class AIProductCheckoutView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    @transaction.atomic
+    def post(self, request):
+        product_code = request.data.get("product_code")
+
+        product = AI_PRODUCTS.get(product_code)
+
+        if product is None:
+            raise ValidationError(
+                "محصول انتخاب‌شده معتبر نیست."
+            )
+
+        order = AIProductOrder.objects.create(
+            student=request.user,
+            product_code=product_code,
+            amount_rial=product["amount_rial"],
+        )
+
+        payload = {
+            "order_id": str(order.id),
+            "product_code": product_code,
+            "amount_rial": product["amount_rial"],
+            "mobile": request.user.mobile,
+            "callback_url": (
+                f"{settings.APP_ORIGIN}"
+                "/dashboard/ai/payment-result"
+            ),
+        }
+
+        try:
+            response = requests.post(
+                f"{settings.VIDEOPOL_API_URL.rstrip('/')}"
+                "/api/payments/",
+                json=payload,
+                headers={
+                    "Authorization": (
+                        f"Bearer {settings.VIDEOPOL_API_KEY}"
+                    ),
+                    "Content-Type": "application/json",
+                    "Idempotency-Key": str(order.id),
+                },
+                timeout=20,
+            )
+        except requests.RequestException:
+            order.status = AIProductOrder.STATUS.FAILED
+            order.save(update_fields=["status", "updated_at"])
+
+            return APIResponse(
+                success=False,
+                called_by="webapp",
+                message="درگاه پرداخت در دسترس نیست.",
+                status=503,
+            )
+
+        try:
+            payment_body = response.json()
+        except ValueError:
+            payment_body = {}
+
+        if (
+            not response.ok
+            or payment_body.get("status") != "pending"
+            or not payment_body.get("gateway_url")
+        ):
+            order.status = AIProductOrder.STATUS.FAILED
+            order.save(update_fields=["status", "updated_at"])
+
+            return APIResponse(
+                success=False,
+                called_by="webapp",
+                message=(
+                    payment_body.get("message")
+                    or "ایجاد پرداخت ناموفق بود."
+                ),
+                status=502,
+            )
+
+        order.videopol_payment_id = str(
+            payment_body.get("payment_id", "")
+        )
+        order.payment_url = payment_body["gateway_url"]
+        order.save(
+            update_fields=[
+                "videopol_payment_id",
+                "payment_url",
+                "updated_at",
+            ]
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="درخواست پرداخت ایجاد شد.",
+            data={
+                "order_id": str(order.id),
+                "payment_url": order.payment_url,
+            },
+            status=200,
         )

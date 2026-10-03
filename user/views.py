@@ -2,6 +2,7 @@ from uuid import UUID
 
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
+from django.contrib.auth.models import Group
 
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -67,6 +68,11 @@ class LoginOTPRequestView(APIView):
             user.save(
                 update_fields=["password"]
             )
+            student_group = Group.objects.get(
+                name="دانشجویان",
+            )
+
+            user.groups.add(student_group)
             send_welcome_sms.delay_on_commit(
                 user_id=user.pk,
             )

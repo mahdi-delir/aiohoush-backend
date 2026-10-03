@@ -1,7 +1,6 @@
 from django.db import models
 from django.conf import settings
-
-# Create your models here.
+import uuid
 
 class OrderComment(models.Model):
     order = models.ForeignKey(
@@ -111,7 +110,6 @@ class Order(models.Model):
             ),
         ]
 
-
 class RequestedProduct(models.Model):
     order = models.ForeignKey(
         'order.Order',
@@ -161,3 +159,73 @@ class RequestedProduct(models.Model):
                 name="requested_product_discount_lte_price",
             ),
         ]
+
+class AIProductOrder(models.Model):
+    class STATUS(models.TextChoices):
+        PENDING = "pending", "در انتظار پرداخت"
+        PAID = "paid", "پرداخت شده"
+        FAILED = "failed", "ناموفق"
+        CANCELLED = "cancelled", "لغو شده"
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name="شناسه سفارش محصول هوش مصنوعی"
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="ai_product_orders",
+        verbose_name="کاربر"
+    )
+
+    product_code = models.CharField(
+        max_length=80,
+        verbose_name='کد محصول',
+    )
+
+    amount_rial = models.PositiveBigIntegerField(
+        verbose_name='مبلغ سفارش (ریال)',
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS.choices,
+        default=STATUS.PENDING,
+        verbose_name='وضعیت سفارش',
+    )
+
+    videopol_payment_id = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name='شناسه پرداخت ویدوپول'
+    )
+
+    payment_url = models.URLField(
+        blank=True,
+        verbose_name='آدرس پرداخت'
+    )
+
+    reference_id = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name='شناسه مرجع پرداخت'
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='تاریخ ایجاد'
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='تاریخ به‌روزرسانی'
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user} - {self.product_code}"

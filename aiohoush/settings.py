@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'notification',
     'order',
     'accounting',
+    'product',
 ]
 
 MIDDLEWARE = [
@@ -233,3 +234,15 @@ LOGGING = {
         },
     },
 }
+
+VIDEOPOL_API_URL = env.str(
+    "VIDEOPOL_API_URL",
+)
+
+VIDEOPOL_API_KEY = env.str(
+    "VIDEOPOL_API_KEY",
+)
+
+APP_ORIGIN = env.str(
+    "APP_ORIGIN",
+)

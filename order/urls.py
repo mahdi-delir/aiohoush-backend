@@ -4,7 +4,11 @@ from rest_framework.routers import (
 
 from .views import (
     OrderManagementViewSet,
+    AIProductCheckoutView
 )
+
+from django.urls import path
+
 
 
 router = DefaultRouter()
@@ -16,3 +20,12 @@ router.register(
 )
 
 urlpatterns = router.urls
+
+
+urlpatterns = [
+    path(
+        "ai-products/checkout/",
+        AIProductCheckoutView.as_view(),
+        name="ai-product-checkout",
+    ),
+]
