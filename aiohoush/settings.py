@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import environ
 
@@ -130,6 +131,9 @@ USE_TZ = True
 
 STATIC_URL = 'public/static/'
 MEDIA_URL = 'public/media/'
+
+MEDIA_ROOT = os.path.join(BASE_DIR, 'public', 'media')
+STATIC_ROOT = os.path.join(BASE_DIR, 'public', 'static') 
 
 
 # Email

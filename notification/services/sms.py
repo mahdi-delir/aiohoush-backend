@@ -1,9 +1,5 @@
 import requests
 
-from celery.utils.log import get_task_logger
-logger = get_task_logger(__name__)
-
-
 from dataclasses import dataclass
 from typing import Sequence
 
@@ -148,20 +144,6 @@ def send_sms_requests(
             trace_ids = tuple(
                 message.trace_id
                 for message in batch
-            )
-
-            logger.info(
-                "Payamresan payload metadata: recipients=%s",
-                [
-                    {
-                        "Sender": settings.PAYAMRESAN_SENDER,
-                        "Destination": message.recipient,
-                        "UserTraceId": message.trace_id,
-                        "TextLength": len(message.text),
-                        "HasText": bool(message.text),
-                    }
-                    for message in batch
-                ],
             )
 
             payload = {

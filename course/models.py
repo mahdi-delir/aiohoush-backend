@@ -581,3 +581,117 @@ class CourseSessionWatchedRange(models.Model):
                 name="course_watched_range_idx",
             ),
         ]
+
+from pathlib import Path
+from uuid import uuid4
+
+from django.conf import settings
+from django.db import models
+
+
+def homework_submission_upload_to(
+    instance,
+    filename,
+):
+    filename = Path(filename).name
+
+    return (
+        "homework_submissions/"
+        f"{instance.student.mobile}/"
+        f"{instance.session_id}/"
+        f"{uuid4().hex}_{filename}"
+    )
+
+
+class CourseSessionHomeworkSubmission(models.Model):
+    class STATUS(models.TextChoices):
+        SUBMITTED = "submitted", "ارسال شده"
+        REVIEWED = "reviewed", "بررسی شده"
+
+
+    session = models.ForeignKey(
+        "course.CourseSession",
+        on_delete=models.PROTECT,
+        related_name="homework_submissions",
+    )
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="homework_submissions",
+    )
+
+    answer = models.TextField(
+        blank=True,
+    )
+
+    attachment = models.FileField(
+        upload_to=(
+            homework_submission_upload_to
+        ),
+        blank=True,
+        null=True,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS.choices,
+        default=STATUS.SUBMITTED,
+    )
+
+    feedback = models.TextField(
+        blank=True,
+    )
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name=(
+            "reviewed_homework_submissions"
+        ),
+        blank=True,
+        null=True,
+    )
+
+    reviewed_at = models.DateTimeField(
+        blank=True,
+        null=True,
+    )
+
+    submitted_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "student"],
+                name="unique_student_session_homework"
+            ),
+        ]
+
+        indexes = [
+            models.Index(
+                fields=["student","-updated_at"]
+            ),
+            models.Index(
+                fields=["session", "status"]
+            ),
+        ]
+
+        permissions = [
+            (
+                "review_homework_submission",
+                "Can review homework submission",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.student_id} - "
+            f"{self.session_id}"
+        )

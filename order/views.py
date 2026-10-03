@@ -129,7 +129,9 @@ class OrderManagementViewSet(
     ):
         order = (
             self.get_queryset()
-            .select_for_update()
+            .select_for_update(
+                 of=("self",)
+            )
             .get(pk=pk)
         )
 
@@ -137,6 +139,16 @@ class OrderManagementViewSet(
             request,
             order,
         )
+        if order.status != Order.STATUS.PENDING:
+            return APIResponse(
+                success=False,
+                called_by="webapp",
+                message=(
+                    "فقط سفارش در انتظار بررسی "
+                    "قابل تأیید است."
+                ),
+                status=status.HTTP_200_OK,
+            )
 
         order.status = (
             Order.STATUS.APPROVED
@@ -174,7 +186,9 @@ class OrderManagementViewSet(
     ):
         order = (
             self.get_queryset()
-            .select_for_update()
+            .select_for_update(
+                 of=("self",)
+            )
             .get(pk=pk)
         )
 
@@ -182,6 +196,17 @@ class OrderManagementViewSet(
             request,
             order,
         )
+
+        if order.status != Order.STATUS.PENDING:
+            return APIResponse(
+                success=False,
+                called_by="webapp",
+                message=(
+                    "فقط سفارش در انتظار بررسی "
+                    "قابل رد است."
+                ),
+                status=status.HTTP_200_OK,
+            )
 
         order.status = (
             Order.STATUS.REJECTED
@@ -295,4 +320,26 @@ class OrderManagementViewSet(
             ),
             data=serializer.data,
             status=status.HTTP_201_CREATED,
+        )
+    def retrieve(
+            self,
+            request,
+            *args,
+            **kwargs,
+        ):
+        instance = self.get_object()
+
+        serializer = self.get_serializer(
+            instance,
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message=(
+                "اطلاعات سفارش با موفقیت "
+                "دریافت شد."
+            ),
+            data=serializer.data,
+            status=status.HTTP_200_OK,
         )
