@@ -216,3 +216,20 @@ SMS_CONNECT_TIMEOUT = env.float("SMS_CONNECT_TIMEOUT")
 SMS_READ_TIMEOUT = env.float("SMS_READ_TIMEOUT")
 CORS_ALLOWED_ORIGINS=env.list('CORS_ALLOWED_ORIGINS', default=[])
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
