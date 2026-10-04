@@ -85,6 +85,9 @@ class CourseCategory(models.Model):
         verbose_name='زمان به روزرسانی'
     )
 
+    def __str__(self):
+        return self.title
+
 class Course(models.Model):
     class LEVEL(models.TextChoices):
         BEGINNER = 'beginner', 'مبتدی'
