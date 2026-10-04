@@ -359,6 +359,8 @@ class CourseSession(models.Model):
                 name="unique_season_session_order",
             ),
         ]
+    def __str__(self):
+        return f"{self.season.course.title} - {self.season.title} - {self.title}"
 
 class CourseSessionProgress(models.Model):
     user = models.ForeignKey(
