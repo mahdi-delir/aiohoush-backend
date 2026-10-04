@@ -1,5 +1,7 @@
 import uuid
 
+from pathlib import Path
+
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
 from django.utils.translation import gettext_lazy as _
@@ -8,6 +10,18 @@ from django.conf import settings
 from aiohoush.utilities.normalizers import normalize_mobile_to_09
 from aiohoush.utilities.validators import mobile_validator, national_id_validator, postal_code_validator
 # Create your models here.
+
+def user_avatar_upload_to(
+    instance,
+    filename,
+):
+    filename = Path(filename).name
+
+    return (
+        "avatars/"
+        f"{instance.mobile}/"
+        f"{uuid.uuid4().hex}_{filename}"
+    )
 
 class UserManager(BaseUserManager):
     def create_user(self, mobile, password = None, **kwargs):
@@ -74,6 +88,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     
     is_mobile_verified = models.BooleanField(default=False,
                                       verbose_name=_('موبایل تایید شده است؟'))
+
+    is_profile_completed = models.BooleanField(
+        default=False,
+        verbose_name=_('پروفایل تکمیل شده است؟')
+    )
     
     date_joined = models.DateTimeField(auto_now_add=True,
                                        verbose_name=_('زمان ایجاد؟'))
@@ -84,12 +103,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_of_birth = models.DateField(null=True, blank=True, verbose_name=_('تاریخ تولد'))
 
     address = models.TextField(blank=True, null=True, verbose_name=_('آدرس پستی'))
-    
-    postal_code = models.CharField(max_length=10,
-                                   blank=True,
-                                   null=True,
-                                   validators=[postal_code_validator],
-                                   verbose_name=_('کد پستی'))
+
+    bio = models.CharField(
+        max_length=200,
+        blank=True,
+        null=True,
+        verbose_name=_('بیوگرافی')
+    )
+
+    postal_code = models.CharField(
+        max_length=10,
+        blank=True,
+        null=True,
+        validators=[postal_code_validator],
+        verbose_name=_('کد پستی')
+    )
+
     referral_code = models.ForeignKey(
         'user.ReferralCode',
         on_delete=models.PROTECT,
@@ -114,10 +143,27 @@ class User(AbstractBaseUser, PermissionsMixin):
         return f"{self.mobile} - {full_name}" if full_name else self.mobile
 
 class UserProfilePicture(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name=_('کاربر'), related_name='profile_pictures')
-    picture = models.ImageField(upload_to='profilepictures/', verbose_name=_('عکس پروفایل'))
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('تاریخ بارگزاری'))
-    is_deleted = models.BooleanField(default=False, verbose_name=_('حذف شده'))
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name=_('کاربر'),
+        related_name='profile_pictures'
+    )
+
+    picture = models.ImageField(
+        upload_to=user_avatar_upload_to,
+        verbose_name=_('عکس پروفایل')
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_('تاریخ بارگزاری')
+    )
+
+    is_deleted = models.BooleanField(
+        default=False,
+        verbose_name=_('حذف شده')
+    )
 
     def __str__(self):
         return f"عکس پروفایل {self.user}"

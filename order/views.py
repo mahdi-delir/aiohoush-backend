@@ -397,8 +397,8 @@ class AIProductCheckoutView(APIView):
             "amount_rial": product["amount_rial"],
             "mobile": request.user.mobile,
             "callback_url": (
-                f"{settings.APP_ORIGIN}"
-                "/dashboard/ai/payment-result"
+                "https://api.aiohoush.com"
+                "/order/ai-products/payment-return/"
             ),
         }
 
