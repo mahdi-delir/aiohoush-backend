@@ -10,6 +10,7 @@ from .views import (
     CourseCatalogCategoryView,
     CourseDetailView,
     HomeworkSubmissionView,
+    SessionSourceCodeView,
     MyCourseHomeworkView,
     GiftVideoListView,
     GiftVideoDetailView,
@@ -41,6 +42,11 @@ urlpatterns += [
         "sessions/<int:session_id>/homework/",
         HomeworkSubmissionView.as_view(),
         name="session-homework",
+    ),
+    path(
+        "sessions/<int:session_id>/source-code/",
+        SessionSourceCodeView.as_view(),
+        name="session-source-code",
     ),
     path(
         "catalog/<slug:slug>/",

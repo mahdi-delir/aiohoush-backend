@@ -212,3 +212,5 @@ secrets/
 public/
 
 *.zip
+# Protected uploads (session source code)
+private_media/

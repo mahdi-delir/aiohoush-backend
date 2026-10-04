@@ -1,3 +1,5 @@
+from django.urls import reverse
+
 from rest_framework import serializers
 
 
@@ -30,12 +32,14 @@ def format_duration(value):
 class CourseSessionDetailSerializer(
     serializers.ModelSerializer
 ):
-    playerUrl = serializers.CharField(
-        source="video_url",
-        allow_blank=True,
-        allow_null=True,
-        read_only=True,
-    )
+    """جلسه در صفحهٔ دوره.
+
+    برای جلسهٔ قفل (کاربر بدون دسترسی و جلسهٔ غیرعمومی) آدرس ویدئو و
+    سورس کد هرگز ارسال نمی‌شود. مقدار ``can_access_course`` باید توسط
+    view در context قرار بگیرد؛ پیش‌فرض بسته است.
+    """
+
+    playerUrl = serializers.SerializerMethodField()
 
     cover = serializers.ImageField(
         source="poster",
@@ -43,13 +47,11 @@ class CourseSessionDetailSerializer(
         read_only=True,
     )
 
+    is_locked = serializers.SerializerMethodField()
+
     has_source_code = serializers.SerializerMethodField()
 
-    source_code_url = serializers.FileField(
-        source="source_code",
-        allow_null=True,
-        read_only=True,
-    )
+    source_code_url = serializers.SerializerMethodField()
 
     duration = serializers.SerializerMethodField()
 
@@ -64,14 +66,40 @@ class CourseSessionDetailSerializer(
             "duration",
             "playerUrl",
             "cover",
+            "is_locked",
             "has_source_code",
             "source_code_url",
             "has_homework",
             "is_public",
         ]
 
+    def _is_locked(self, obj):
+        course_access = self.context.get(
+            "can_access_course",
+            False,
+        )
+        return not (obj.is_public or course_access)
+
+    def get_is_locked(self, obj):
+        return self._is_locked(obj)
+
+    def get_playerUrl(self, obj):
+        if self._is_locked(obj):
+            return None
+        return obj.video_url or None
+
     def get_has_source_code(self, obj):
         return bool(obj.source_code)
+
+    def get_source_code_url(self, obj):
+        # فایل در storage خصوصی است؛ فقط آدرس endpoint محافظت‌شده
+        # برگردانده می‌شود، نه آدرس مستقیم فایل.
+        if not obj.source_code or self._is_locked(obj):
+            return None
+        return reverse(
+            "session-source-code",
+            kwargs={"session_id": obj.pk},
+        )
 
     def get_duration(self, obj):
         return format_duration(obj.duration)

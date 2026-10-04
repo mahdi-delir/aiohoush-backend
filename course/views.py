@@ -1,8 +1,12 @@
+from pathlib import Path
+
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from django.db.models import (
     Count,
     Exists,
     OuterRef,
+    Prefetch,
     Q,
     Sum,
 )
@@ -18,7 +22,12 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 
 from aiohoush.core.responses import APIResponse
-from .models import Course, CourseCategory, CourseSessionHomeworkSubmission, CourseSession, GiftVideo
+from .access import (
+    annotate_has_purchased,
+    can_access_course,
+    can_access_session,
+)
+from .models import Course, CourseCategory, CourseSeason, CourseSessionHomeworkSubmission, CourseSession, GiftVideo
 from .permissions import CourseManagementPermission
 from .serializers import (
     CourseSerializer,
@@ -428,20 +437,12 @@ class CourseDetailView(APIView):
     def get(self, request, slug):
         user = request.user
 
-        access = (
-            RequestedProduct.objects
-            .filter(
-                course_id=OuterRef("pk"),
-                order__student=user,
-                order__status=Order.STATUS.APPROVED,
-                order__is_deleted=False,
-            )
-        )
-
         queryset = (
-            Course.objects
+            annotate_has_purchased(
+                Course.objects.all(),
+                user,
+            )
             .annotate(
-                has_access=Exists(access),
                 all_sessions=Count(
                     "seasons__sessions",
                     distinct=True,
@@ -464,7 +465,20 @@ class CourseDetailView(APIView):
             )
             .prefetch_related(
                 "categories",
-                "seasons__sessions",
+                Prefetch(
+                    "seasons",
+                    queryset=CourseSeason.objects.order_by(
+                        "order",
+                        "id",
+                    ),
+                ),
+                Prefetch(
+                    "seasons__sessions",
+                    queryset=CourseSession.objects.order_by(
+                        "order",
+                        "id",
+                    ),
+                ),
             )
         )
 
@@ -473,17 +487,27 @@ class CourseDetailView(APIView):
             slug=slug,
         )
 
-        if not course.has_access and not (
+        course_access = can_access_course(
+            user,
+            course,
+            has_purchased=course.has_purchased,
+        )
+
+        if not course_access and not (
             course.is_published and course.can_sale
         ):
             raise PermissionDenied(
                 "به این دوره دسترسی ندارید."
             )
 
+        # has_access در خروجی یعنی «امکان مشاهدهٔ کامل دوره»
+        course.has_access = course_access
+
         serializer = CourseDetailSerializer(
             course,
             context={
                 "request": request,
+                "can_access_course": course_access,
             },
         )
 
@@ -494,6 +518,42 @@ class CourseDetailView(APIView):
             data=serializer.data,
             status=status.HTTP_200_OK,
         )
+
+
+class SessionSourceCodeView(APIView):
+    """دانلود سورس کد جلسه فقط برای کاربر دارای دسترسی."""
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request, session_id):
+        session = get_object_or_404(
+            CourseSession.objects.select_related(
+                "season__course",
+            ),
+            pk=session_id,
+        )
+
+        if not can_access_session(request.user, session):
+            raise PermissionDenied(
+                "به این جلسه دسترسی ندارید."
+            )
+
+        if not session.source_code:
+            raise Http404("این جلسه سورس کد ندارد.")
+
+        try:
+            file = session.source_code.open("rb")
+        except FileNotFoundError:
+            raise Http404("فایل سورس کد پیدا نشد.")
+
+        return FileResponse(
+            file,
+            as_attachment=True,
+            filename=Path(session.source_code.name).name,
+        )
+
 
 class MyCourseHomeworkView(APIView):
     permission_classes = [

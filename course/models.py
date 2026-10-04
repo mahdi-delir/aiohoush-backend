@@ -6,6 +6,29 @@ from datetime import timedelta
 
 from django.db import models
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
+
+
+def private_media_storage():
+    """فایل‌هایی که نباید مستقیم از وب سرور سرو شوند.
+
+    این مسیر نباید در nginx (یا هر وب سرور دیگری) به صورت عمومی
+    سرو شود؛ دانلود فقط از طریق view دارای بررسی دسترسی انجام می‌شود.
+    """
+    return FileSystemStorage(location=settings.PRIVATE_MEDIA_ROOT)
+
+
+def session_source_code_upload_to(
+    instance,
+    filename,
+):
+    filename = Path(filename).name
+
+    return (
+        "course-source-codes/"
+        f"{uuid.uuid4().hex}/"
+        f"{filename}"
+    )
 
 
 def homework_submission_upload_to(
@@ -304,7 +327,8 @@ class CourseSession(models.Model):
     )
 
     source_code = models.FileField(
-        upload_to='course-source-codes/',
+        upload_to=session_source_code_upload_to,
+        storage=private_media_storage,
         blank = True,
         null = True,
         verbose_name = 'سورس کد های جلسه'
