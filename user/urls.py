@@ -8,7 +8,10 @@ from .views import (
     LogoutAllView,
     ActiveSessionsView,
     RevokeSessionView,
-    MeView
+    MeView,
+    ProfileView,
+    ProfilePicturesView,
+    ProfilePictureDeleteView,
     )
 
 
@@ -53,4 +56,7 @@ urlpatterns = [
         MeView.as_view(),
         name="auth-me",
     ),
+    path("profile/", ProfileView.as_view(), name="profile"),
+    path("profile/pictures/", ProfilePicturesView.as_view(), name="profile-pictures"),
+    path("profile/pictures/<int:picture_id>/", ProfilePictureDeleteView.as_view(), name="profile-picture-delete"),
 ]

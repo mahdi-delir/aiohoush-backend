@@ -299,3 +299,80 @@ class MeView(APIView):
             called_by='webapp',
             data=serializer.data,
         )
+
+class ProfileView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        from .serializers import ProfileSerializer
+        return APIResponse(
+            success=True, message="پروفایل دریافت شد.", called_by="webapp",
+            data=ProfileSerializer(request.user).data,
+        )
+
+    def patch(self, request):
+        from .serializers import ProfileSerializer
+        serializer = ProfileSerializer(
+            request.user, data=request.data, partial=True,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        return APIResponse(
+            success=True, message="پروفایل با موفقیت بروزرسانی شد.", called_by="webapp",
+            data=ProfileSerializer(serializer.save(), context={"request": request}).data,
+        )
+
+
+class ProfilePicturesView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        from .serializers import ProfilePictureSerializer
+        pictures = request.user.user_pictures_qs()
+        return APIResponse(
+            success=True, message="تصاویر پروفایل دریافت شد.", called_by="webapp",
+            data=ProfilePictureSerializer(
+                pictures, many=True, context={"request": request}
+            ).data,
+        )
+
+    def post(self, request):
+        from .models import UserProfilePicture
+        from .serializers import ProfilePictureSerializer
+        picture = request.FILES.get("picture")
+        if not picture:
+            return APIResponse(
+                success=False, message="فایل تصویر ارسال نشده است.",
+                called_by="webapp", status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not picture.content_type.startswith("image/"):
+            return APIResponse(
+                success=False, message="فرمت تصویر معتبر نیست.",
+                called_by="webapp", status=status.HTTP_400_BAD_REQUEST,
+            )
+        obj = UserProfilePicture.objects.create(user=request.user, picture=picture)
+        return APIResponse(
+            success=True, message="تصویر با موفقیت آپلود شد.", called_by="webapp",
+            data=ProfilePictureSerializer(obj, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ProfilePictureDeleteView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def delete(self, request, picture_id):
+        from .models import UserProfilePicture
+        picture = UserProfilePicture.objects.filter(
+            id=picture_id, user=request.user, is_deleted=False,
+        ).first()
+        if picture is None:
+            return APIResponse(
+                success=False, message="تصویر پیدا نشد.", called_by="webapp",
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        picture.is_deleted = True
+        picture.save(update_fields=("is_deleted",))
+        return APIResponse(
+            success=True, message="تصویر حذف شد.", called_by="webapp", data={},
+        )

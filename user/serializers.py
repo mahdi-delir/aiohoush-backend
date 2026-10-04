@@ -11,7 +11,7 @@ from rest_framework_simplejwt.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.settings import api_settings
 
 
-from .models import User, AuthSession
+from .models import User, AuthSession, UserProfilePicture
 
 mobile_model_field = User._meta.get_field("mobile")
 
@@ -164,3 +164,44 @@ class MeResponseSerializer(serializers.Serializer):
         child=serializers.CharField(),
     )
     user_data = UserDataSerializer()
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            "id", "first_name", "last_name", "mobile", "email",
+            "national_id", "address", "bio", "is_profile_completed",
+        )
+        read_only_fields = ("id", "mobile", "is_profile_completed")
+
+    def validate_email(self, value):
+        return value or None
+
+    def validate_national_id(self, value):
+        from aiohoush.utilities.digits import normalize_number_to_en
+        value = normalize_number_to_en(value or "")
+        if value:
+            User._meta.get_field("national_id").run_validators(value)
+        return value or None
+
+    def update(self, instance, validated_data):
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.is_profile_completed = bool(
+            (instance.first_name or "").strip()
+            and (instance.last_name or "").strip()
+        )
+        instance.save()
+        return instance
+
+
+class ProfilePictureSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = UserProfilePicture
+        fields = ("id", "url", "created_at")
+        read_only_fields = fields
+
+    def get_url(self, obj):
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.picture.url) if request else obj.picture.url
