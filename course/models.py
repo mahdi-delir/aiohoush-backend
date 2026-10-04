@@ -280,6 +280,8 @@ class CourseSeason(models.Model):
                 name="unique_course_season_order",
             ),
         ]
+    def __str__(self):
+        return f"{self.course.title} - {self.title}"
 
 class CourseSession(models.Model):
     season = models.ForeignKey(
