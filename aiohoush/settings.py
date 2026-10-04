@@ -250,6 +250,24 @@ VIDEOPOL_API_KEY = env.str(
     "VIDEOPOL_API_KEY",
 )
 
+VIDEOPOL_TIMEOUT_SECONDS = env.float(
+    "VIDEOPOL_TIMEOUT_SECONDS",
+    default=15,
+)
+
 APP_ORIGIN = env.str(
     "APP_ORIGIN",
+)
+
+# آدرسی که ویدوپل بعد از درگاه کاربر را به آن برمی‌گرداند. hostname آن
+# باید با AIOHOUSH_ALLOWED_CALLBACK_HOST در ویدوپل یکی باشد.
+AI_PAYMENT_CALLBACK_URL = env.str(
+    "AI_PAYMENT_CALLBACK_URL",
+    default="https://api.aiohoush.com/order/ai-products/payment-return/",
+)
+
+# صفحهٔ فرانت که نتیجهٔ پرداخت را نشان می‌دهد.
+AI_PAYMENT_RESULT_URL = env.str(
+    "AI_PAYMENT_RESULT_URL",
+    default=f"{APP_ORIGIN.rstrip('/')}/dashboard/ai",
 )

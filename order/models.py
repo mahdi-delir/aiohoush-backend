@@ -214,6 +214,12 @@ class AIProductOrder(models.Model):
         verbose_name='شناسه مرجع پرداخت'
     )
 
+    paid_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name='زمان پرداخت'
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name='تاریخ ایجاد'
@@ -226,6 +232,12 @@ class AIProductOrder(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(
+                fields=["videopol_payment_id"],
+                name="ai_order_videopol_payment_idx",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.user} - {self.product_code}"

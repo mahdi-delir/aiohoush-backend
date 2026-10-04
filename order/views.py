@@ -20,15 +20,24 @@ from .permissions import (
 from .serializers import (
     OrderSerializer,
 )
-import requests
+import logging
+from urllib.parse import urlencode
 
 from django.conf import settings
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
 
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
 
 from aiohoush.core.responses import APIResponse
+
+from .services import videopol
+
+
+logger = logging.getLogger(__name__)
 
 
 class OrderManagementViewSet(
@@ -133,12 +142,12 @@ class OrderManagementViewSet(
         request,
         pk=None,
     ):
-        order = (
+        order = get_object_or_404(
             self.get_queryset()
             .select_for_update(
                  of=("self",)
-            )
-            .get(pk=pk)
+            ),
+            pk=pk,
         )
 
         self.check_object_permissions(
@@ -190,12 +199,12 @@ class OrderManagementViewSet(
         request,
         pk=None,
     ):
-        order = (
+        order = get_object_or_404(
             self.get_queryset()
             .select_for_update(
                  of=("self",)
-            )
-            .get(pk=pk)
+            ),
+            pk=pk,
         )
 
         self.check_object_permissions(
@@ -369,12 +378,14 @@ AI_PRODUCTS = {
     },
 }
 
+
 class AIProductCheckoutView(APIView):
     permission_classes = [
         IsAuthenticated,
     ]
 
-    @transaction.atomic
+    # عمداً atomic نیست: درخواست HTTP به ویدوپل نباید تراکنش
+    # دیتابیس را باز نگه دارد.
     def post(self, request):
         product_code = request.data.get("product_code")
 
@@ -386,74 +397,37 @@ class AIProductCheckoutView(APIView):
             )
 
         order = AIProductOrder.objects.create(
-            student=request.user,
+            user=request.user,
             product_code=product_code,
             amount_rial=product["amount_rial"],
         )
 
-        payload = {
-            "order_id": str(order.id),
-            "product_code": product_code,
-            "amount_rial": product["amount_rial"],
-            "mobile": request.user.mobile,
-            "callback_url": (
-                "https://api.aiohoush.com"
-                "/order/ai-products/payment-return/"
-            ),
-        }
-
         try:
-            response = requests.post(
-                f"{settings.VIDEOPOL_API_URL.rstrip('/')}"
-                "/api/payments/",
-                json=payload,
-                headers={
-                    "Authorization": (
-                        f"Bearer {settings.VIDEOPOL_API_KEY}"
-                    ),
-                    "Content-Type": "application/json",
-                    "Idempotency-Key": str(order.id),
-                },
-                timeout=20,
+            payment = videopol.create_payment(
+                order_id=str(order.id),
+                product_code=product_code,
+                amount_rial=product["amount_rial"],
+                mobile=request.user.mobile,
+                callback_url=settings.AI_PAYMENT_CALLBACK_URL,
             )
-        except requests.RequestException:
+        except videopol.VideopolError:
+            logger.exception(
+                "Videopol payment creation failed for AI order %s",
+                order.id,
+            )
+
             order.status = AIProductOrder.STATUS.FAILED
             order.save(update_fields=["status", "updated_at"])
 
             return APIResponse(
                 success=False,
                 called_by="webapp",
-                message="درگاه پرداخت در دسترس نیست.",
-                status=503,
+                message="ایجاد پرداخت ناموفق بود. لطفاً دوباره تلاش کنید.",
+                status=status.HTTP_502_BAD_GATEWAY,
             )
 
-        try:
-            payment_body = response.json()
-        except ValueError:
-            payment_body = {}
-
-        if (
-            not response.ok
-            or payment_body.get("status") != "pending"
-            or not payment_body.get("gateway_url")
-        ):
-            order.status = AIProductOrder.STATUS.FAILED
-            order.save(update_fields=["status", "updated_at"])
-
-            return APIResponse(
-                success=False,
-                called_by="webapp",
-                message=(
-                    payment_body.get("message")
-                    or "ایجاد پرداخت ناموفق بود."
-                ),
-                status=502,
-            )
-
-        order.videopol_payment_id = str(
-            payment_body.get("payment_id", "")
-        )
-        order.payment_url = payment_body["gateway_url"]
+        order.videopol_payment_id = payment.payment_id
+        order.payment_url = payment.gateway_url
         order.save(
             update_fields=[
                 "videopol_payment_id",
@@ -470,5 +444,130 @@ class AIProductCheckoutView(APIView):
                 "order_id": str(order.id),
                 "payment_url": order.payment_url,
             },
-            status=200,
+            status=status.HTTP_200_OK,
         )
+
+
+class AIProductPaymentReturnView(APIView):
+    """بازگشت مرورگر کاربر از ویدوپل بعد از درگاه.
+
+    پارامترهای URL (payment_id و status) قابل جعل‌اند؛ فقط payment_id
+    برای پیدا کردن سفارش استفاده می‌شود و وضعیت واقعی از API ویدوپل
+    استعلام می‌شود. در پایان کاربر به صفحهٔ نتیجه در فرانت هدایت می‌شود.
+    """
+
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        payment_id = str(
+            request.query_params.get("payment_id", "")
+        ).strip()
+
+        if not payment_id.isdigit():
+            return self._redirect("failed")
+
+        order = (
+            AIProductOrder.objects
+            .filter(videopol_payment_id=payment_id)
+            .only("id", "status")
+            .first()
+        )
+
+        if order is None:
+            logger.warning(
+                "Payment return for unknown videopol payment %s",
+                payment_id,
+            )
+            return self._redirect("failed")
+
+        if order.status == AIProductOrder.STATUS.PAID:
+            return self._redirect("paid", order.id)
+
+        try:
+            remote = videopol.get_payment_status(payment_id)
+        except videopol.VideopolError:
+            logger.exception(
+                "Videopol status lookup failed for AI order %s",
+                order.id,
+            )
+            return self._redirect("pending", order.id)
+
+        result = apply_videopol_payment_status(
+            order_id=order.id,
+            remote=remote,
+        )
+
+        return self._redirect(result, order.id)
+
+    @staticmethod
+    def _redirect(result, order_id=None):
+        query = {"payment": result}
+
+        if order_id is not None:
+            query["order"] = str(order_id)
+
+        return HttpResponseRedirect(
+            f"{settings.AI_PAYMENT_RESULT_URL}?{urlencode(query)}"
+        )
+
+
+@transaction.atomic
+def apply_videopol_payment_status(
+    *,
+    order_id,
+    remote,
+) -> str:
+    """وضعیت استعلام‌شده از ویدوپل را روی سفارش اعمال می‌کند.
+
+    خروجی: "paid" یا "failed" یا "pending".
+    """
+    order = (
+        AIProductOrder.objects
+        .select_for_update()
+        .get(pk=order_id)
+    )
+
+    if order.status == AIProductOrder.STATUS.PAID:
+        return "paid"
+
+    # پرداخت باید دقیقاً متعلق به همین سفارش و همین مبلغ باشد.
+    if (
+        remote.order_id != str(order.id)
+        or remote.payment_id != order.videopol_payment_id
+        or remote.product_code != order.product_code
+        or remote.amount_rial != order.amount_rial
+    ):
+        logger.error(
+            "Videopol payment %s does not match AI order %s",
+            remote.payment_id,
+            order.id,
+        )
+        return "failed"
+
+    if remote.status == "success":
+        order.status = AIProductOrder.STATUS.PAID
+        order.reference_id = remote.reference_id
+        order.paid_at = timezone.now()
+        order.save(
+            update_fields=[
+                "status",
+                "reference_id",
+                "paid_at",
+                "updated_at",
+            ]
+        )
+        return "paid"
+
+    if remote.status in {"failed", "canceled"}:
+        if order.status == AIProductOrder.STATUS.PENDING:
+            order.status = (
+                AIProductOrder.STATUS.CANCELLED
+                if remote.status == "canceled"
+                else AIProductOrder.STATUS.FAILED
+            )
+            order.save(update_fields=["status", "updated_at"])
+        return "failed"
+
+    # created / pending: هنوز نتیجهٔ قطعی نداریم.
+    return "pending"

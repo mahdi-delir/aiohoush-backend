@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from order.models import (
+    AIProductOrder,
     Order,
     OrderComment,
     RequestedProduct,
@@ -142,3 +143,54 @@ class OrderCommentAdmin(admin.ModelAdmin):
         "order",
         "user",
     )
+
+
+@admin.register(AIProductOrder)
+class AIProductOrderAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "user",
+        "product_code",
+        "amount_rial",
+        "status",
+        "reference_id",
+        "paid_at",
+        "created_at",
+    )
+
+    list_filter = (
+        "status",
+        "product_code",
+        "created_at",
+    )
+
+    search_fields = (
+        "id",
+        "user__mobile",
+        "videopol_payment_id",
+        "reference_id",
+    )
+
+    list_select_related = (
+        "user",
+    )
+
+    date_hierarchy = "created_at"
+
+    # وضعیت پرداخت فقط از طریق استعلام ویدوپل تغییر می‌کند.
+    readonly_fields = (
+        "id",
+        "user",
+        "product_code",
+        "amount_rial",
+        "status",
+        "videopol_payment_id",
+        "payment_url",
+        "reference_id",
+        "paid_at",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
