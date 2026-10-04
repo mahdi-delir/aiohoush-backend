@@ -19,7 +19,7 @@ def user_avatar_upload_to(
 
     return (
         "avatars/"
-        f"{instance.mobile}/"
+        f"{instance.user.mobile}/"
         f"{uuid.uuid4().hex}_{filename}"
     )
 
