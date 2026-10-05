@@ -12,6 +12,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from accounting.models import Payment, WalletEntry
+from accounting.services.sales import credit_sale
 
 
 class WalletError(Exception):
@@ -75,6 +76,8 @@ def confirm_payment(*, payment_id: int, by) -> Payment:
         created_by=by,
         payment=payment,
     )
+
+    credit_sale(payment)
 
     return payment
 
@@ -170,6 +173,8 @@ def record_ai_purchase(*, ai_order, product_title: str) -> None:
         payment=payment,
         ai_order=ai_order,
     )
+
+    credit_sale(payment)
 
     WalletEntry.objects.create(
         user=ai_order.user,

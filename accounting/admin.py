@@ -1,7 +1,9 @@
 from django.contrib import admin, messages
 
 from accounting.models import (
+    AccountingSettings,
     BankAccount,
+    SalesCredit,
     Payment,
     WalletEntry,
     WalletTopUp,
@@ -252,6 +254,37 @@ class WalletTopUpAdmin(admin.ModelAdmin):
         "user",
     )
 
+    date_hierarchy = "created_at"
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AccountingSettings)
+class AccountingSettingsAdmin(admin.ModelAdmin):
+    """یک ردیف تنظیمات؛ امکان افزودن ردیف دوم یا حذف وجود ندارد."""
+
+    def has_add_permission(self, request):
+        return not AccountingSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SalesCredit)
+class SalesCreditAdmin(admin.ModelAdmin):
+    """فقط مشاهده؛ از تأیید پرداخت‌ها ساخته می‌شود."""
+
+    list_display = ("id", "seller", "amount", "kind", "payment", "created_at")
+    list_filter = ("kind", "created_at")
+    search_fields = ("seller__mobile", "seller__last_name")
+    list_select_related = ("seller", "payment")
     date_hierarchy = "created_at"
 
     def has_add_permission(self, request):

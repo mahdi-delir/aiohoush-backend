@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import WalletTopUpReturnView, WalletTopUpView, WalletView
+from .views import MentorLeaderboardView, WalletTopUpReturnView, WalletTopUpView, WalletView
 
 
 urlpatterns = [
@@ -18,5 +18,10 @@ urlpatterns = [
         "wallet/top-up/payment-return/",
         WalletTopUpReturnView.as_view(),
         name="wallet-top-up-return",
+    ),
+    path(
+        "mentor-leaderboard/",
+        MentorLeaderboardView.as_view(),
+        name="mentor-leaderboard",
     ),
 ]

@@ -239,3 +239,22 @@ class WalletTopUpReturnView(APIView):
         return HttpResponseRedirect(
             f"{settings.WALLET_TOPUP_RESULT_URL}?{query}"
         )
+
+
+class MentorLeaderboardView(APIView):
+    """برترین منتورهای دورهٔ جاری (فقط امتیاز، بدون مبلغ فروش)."""
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request):
+        from accounting.services.leaderboard import build_leaderboard
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="رتبه‌بندی منتورها دریافت شد.",
+            data=build_leaderboard(request),
+            status=status.HTTP_200_OK,
+        )

@@ -11,6 +11,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounting.models import Payment, WalletEntry, WalletTopUp
+from accounting.services.sales import credit_sale
 from accounting.services.wallet import WalletError
 from order.services import videopol
 
@@ -124,6 +125,7 @@ def apply_top_up_status(*, top_up_id, remote) -> str:
             payment=payment,
             top_up=top_up,
         )
+        credit_sale(payment)
         return "paid"
 
     if remote.status in {"failed", "canceled"}:

@@ -1,5 +1,6 @@
 import uuid
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.conf import settings
 # Create your models here.
@@ -412,3 +413,90 @@ class WalletTopUp(models.Model):
 
     def __str__(self):
         return f"{self.user} - {self.amount_rial}"
+
+
+class AccountingSettings(models.Model):
+    """تنظیمات حسابداری (فقط یک ردیف)."""
+
+    # تا ۲۹: همهٔ ماه‌های شمسی حداقل ۲۹ روز دارند.
+    period_start_day = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(29)],
+        verbose_name="روز شروع دورهٔ ماهانه",
+        help_text="دورهٔ حسابرسی و رتبه‌بندی منتورها از این روز هر ماه شمسی شروع می‌شود (۱ تا ۲۹).",
+    )
+
+    class Meta:
+        verbose_name = "تنظیمات حسابداری"
+        verbose_name_plural = "تنظیمات حسابداری"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls) -> "AccountingSettings":
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def __str__(self):
+        return "تنظیمات حسابداری"
+
+
+class SalesCredit(models.Model):
+    """فروش ثبت‌شده به نام فروشنده (مبنای امتیاز رتبه‌بندی منتورها).
+
+    هر واریز تأییدشدهٔ دانشجو یک ردیف مثبت می‌سازد. مرجوعی ردیف منفی
+    ثبت می‌کند. مبالغ به ریال.
+    """
+
+    class KIND(models.TextChoices):
+        SALE = "sale", "فروش"
+        REFUND = "refund", "مرجوعی"
+
+    seller = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="sales_credits",
+        verbose_name="فروشنده",
+    )
+
+    amount = models.BigIntegerField(
+        verbose_name="مبلغ (ریال، مرجوعی منفی)",
+    )
+
+    kind = models.CharField(
+        max_length=10,
+        choices=KIND.choices,
+        verbose_name="نوع",
+    )
+
+    payment = models.ForeignKey(
+        "accounting.Payment",
+        on_delete=models.PROTECT,
+        related_name="sales_credits",
+        blank=True,
+        null=True,
+        verbose_name="پرداخت",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        db_index=True,
+        verbose_name="زمان ثبت",
+    )
+
+    class Meta:
+        verbose_name = "فروش فروشنده"
+        verbose_name_plural = "فروش فروشندگان"
+        ordering = ("-created_at",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["payment"],
+                condition=models.Q(kind="sale"),
+                name="unique_sale_credit_per_payment",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.seller} {self.amount}"
