@@ -11,6 +11,8 @@ from .views import (
     CourseDetailView,
     HomeworkSubmissionView,
     SessionSourceCodeView,
+    SessionWatchStartView,
+    WatchEventsView,
     MyCourseHomeworkView,
     GiftVideoListView,
     GiftVideoDetailView,
@@ -47,6 +49,16 @@ urlpatterns += [
         "sessions/<int:session_id>/source-code/",
         SessionSourceCodeView.as_view(),
         name="session-source-code",
+    ),
+    path(
+        "sessions/<int:session_id>/watch/",
+        SessionWatchStartView.as_view(),
+        name="session-watch-start",
+    ),
+    path(
+        "watches/<uuid:watch_id>/events/",
+        WatchEventsView.as_view(),
+        name="watch-events",
     ),
     path(
         "catalog/<slug:slug>/",

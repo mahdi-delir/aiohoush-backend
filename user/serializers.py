@@ -7,7 +7,11 @@ from django.db import transaction
 
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from rest_framework_simplejwt.exceptions import AuthenticationFailed
+from rest_framework_simplejwt.exceptions import (
+    AuthenticationFailed,
+    InvalidToken,
+    TokenError,
+)
 from rest_framework_simplejwt.settings import api_settings
 
 
@@ -44,6 +48,14 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
     }
     @transaction.atomic
     def validate(self, attrs):
+        # توکن منقضی، دستکاری‌شده یا blacklist‌شده باید 401 بدهد، نه 500.
+        # BFF با پاسخ 4xx نشست را پاک و کاربر را به ورود هدایت می‌کند.
+        try:
+            return self._validate(attrs)
+        except TokenError as exc:
+            raise InvalidToken(exc.args[0]) from exc
+
+    def _validate(self, attrs):
         refresh = self.token_class(
             attrs['refresh']
         )
@@ -51,7 +63,7 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
         user_id = refresh.get(api_settings.USER_ID_CLAIM)
         if not session_id or not user_id:
             raise AuthenticationFailed(
-                self.error_messages[_("invalid_session")],
+                self.error_messages["invalid_session"],
                 code="invalid_session",
             )
 
@@ -59,7 +71,7 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
             session_uuid = UUID(str(session_id))
         except (ValueError, TypeError, AttributeError):
             raise AuthenticationFailed(
-                self.error_messages[_("invalid_session")],
+                self.error_messages["invalid_session"],
                 code="invalid_session",
             )
         session = (
@@ -74,7 +86,7 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
         )
         if session is None:
             raise AuthenticationFailed(
-                self.error_messages[_("invalid_session")],
+                self.error_messages["invalid_session"],
                 code="invalid_session",
             )
         data = super().validate(attrs)

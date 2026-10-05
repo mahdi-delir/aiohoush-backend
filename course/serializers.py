@@ -1,6 +1,9 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.urls import reverse
 
 from rest_framework import serializers
+
+from aiohoush.utilities.uploads import validate_homework_attachment
 
 
 from course.models import (
@@ -9,8 +12,11 @@ from course.models import (
     CourseSeason,
     CourseSession,
     CourseSessionHomeworkSubmission,
+    CourseSessionWatch,
+    CourseSessionWatchEvent,
     GiftVideo,
 )
+from course.services.watch import progress_percent, session_duration_ms
 def format_duration(value):
     if not value:
         return "0 دقیقه"
@@ -49,6 +55,8 @@ class CourseSessionDetailSerializer(
 
     is_locked = serializers.SerializerMethodField()
 
+    watched_percent = serializers.SerializerMethodField()
+
     has_source_code = serializers.SerializerMethodField()
 
     source_code_url = serializers.SerializerMethodField()
@@ -67,6 +75,7 @@ class CourseSessionDetailSerializer(
             "playerUrl",
             "cover",
             "is_locked",
+            "watched_percent",
             "has_source_code",
             "source_code_url",
             "has_homework",
@@ -82,6 +91,17 @@ class CourseSessionDetailSerializer(
 
     def get_is_locked(self, obj):
         return self._is_locked(obj)
+
+    def get_watched_percent(self, obj):
+        progress = self.context.get(
+            "progress_by_session",
+            {},
+        ).get(obj.pk)
+
+        return progress_percent(
+            progress,
+            session_duration_ms(obj),
+        )
 
     def get_playerUrl(self, obj):
         if self._is_locked(obj):
@@ -426,6 +446,14 @@ class HomeworkSubmissionSerializer(serializers.ModelSerializer):
             "reviewed_at",
         ]
 
+    def validate_attachment(self, value):
+        if value:
+            try:
+                validate_homework_attachment(value)
+            except DjangoValidationError as exc:
+                raise serializers.ValidationError(exc.messages)
+        return value
+
     def validate(self, attrs):
         answer = attrs.get(
             "answer",
@@ -475,3 +503,60 @@ class GiftVideoSerializer(
 
     def get_duration(self, obj):
         return format_duration(obj.duration)
+
+MAX_POSITION_MS = 24 * 60 * 60 * 1000
+
+
+class WatchEventInputSerializer(serializers.Serializer):
+    client_event_id = serializers.UUIDField()
+    sequence = serializers.IntegerField(min_value=0, max_value=1_000_000)
+    event_type = serializers.ChoiceField(
+        choices=CourseSessionWatchEvent.EVENT.choices,
+    )
+    position_ms = serializers.IntegerField(min_value=0, max_value=MAX_POSITION_MS)
+    from_position_ms = serializers.IntegerField(
+        min_value=0, max_value=MAX_POSITION_MS, required=False, allow_null=True,
+    )
+    to_position_ms = serializers.IntegerField(
+        min_value=0, max_value=MAX_POSITION_MS, required=False, allow_null=True,
+    )
+    playback_rate = serializers.DecimalField(
+        max_digits=4, decimal_places=2, min_value=0, max_value=16,
+        required=False, allow_null=True,
+    )
+    occurred_at = serializers.DateTimeField(required=False, allow_null=True)
+
+
+class WatchBatchInputSerializer(serializers.Serializer):
+    events = WatchEventInputSerializer(many=True, max_length=200)
+    ranges = serializers.ListField(
+        child=serializers.ListField(
+            child=serializers.IntegerField(min_value=0, max_value=MAX_POSITION_MS),
+            min_length=2,
+            max_length=2,
+        ),
+        max_length=500,
+        required=False,
+        default=list,
+    )
+    position_ms = serializers.IntegerField(min_value=0, max_value=MAX_POSITION_MS)
+    duration_ms = serializers.IntegerField(
+        min_value=0, max_value=MAX_POSITION_MS, required=False, allow_null=True,
+    )
+    end_reason = serializers.ChoiceField(
+        choices=CourseSessionWatch.ENDREASON.choices,
+        required=False,
+        allow_null=True,
+    )
+
+    def validate_events(self, value):
+        if not value:
+            raise serializers.ValidationError("حداقل یک رویداد لازم است.")
+        return value
+
+    def validate_ranges(self, value):
+        return [
+            (start, end)
+            for start, end in value
+            if end > start
+        ]

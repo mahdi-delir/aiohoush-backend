@@ -1,13 +1,16 @@
+import logging
 from pathlib import Path
 
 from django.http import FileResponse, Http404
 from django.utils import timezone
 from django.db.models import (
     Count,
+    DurationField,
     Exists,
     OuterRef,
     Prefetch,
     Q,
+    Subquery,
     Sum,
 )
 from django.db import transaction
@@ -26,8 +29,10 @@ from .access import (
     annotate_has_purchased,
     can_access_course,
     can_access_session,
+    has_purchased_course,
 )
-from .models import Course, CourseCategory, CourseSeason, CourseSessionHomeworkSubmission, CourseSession, GiftVideo
+from .models import Course, CourseCategory, CourseSeason, CourseSessionHomeworkSubmission, CourseSession, CourseSessionProgress, CourseSessionWatch, GiftVideo
+from .services import watch as watch_service
 from .permissions import CourseManagementPermission
 from .serializers import (
     CourseSerializer,
@@ -36,8 +41,30 @@ from .serializers import (
     CourseDetailSerializer,
     HomeworkSubmissionSerializer,
     GiftVideoSerializer,
+    WatchBatchInputSerializer,
 )
 from order.models import Order, RequestedProduct
+
+
+logger = logging.getLogger(__name__)
+
+def course_total_duration():
+    """مجموع مدت جلسات دوره به صورت subquery.
+
+    Sum روی همان کوئری‌ای که با user_progresses JOIN شده، مدت هر جلسه
+    را به تعداد ردیف‌های پیشرفت ضرب می‌کرد؛ subquery از آن JOIN جداست.
+    """
+    totals = (
+        CourseSession.objects
+        .filter(season__course=OuterRef("pk"))
+        .order_by()
+        .values("season__course")
+        .annotate(total=Sum("duration"))
+        .values("total")[:1]
+    )
+
+    return Subquery(totals, output_field=DurationField())
+
 
 class CourseManagementViewSet(
     mixins.ListModelMixin,
@@ -170,7 +197,7 @@ class CourseCatalogView(APIView):
             season_count=Count("seasons",distinct=True),
             completed_sessions=Count("seasons__sessions", filter=Q(
                 seasons__sessions__user_progresses__user=user, seasons__sessions__user_progresses__completed_at__isnull=False), distinct=True),
-                total_duration=Sum("seasons__sessions__duration"),
+                total_duration=course_total_duration(),
             ).filter(Q(has_access=True) | Q(is_published=True, can_sale=True,)
             ).prefetch_related("categories"
             ).order_by("order", "id"
@@ -246,6 +273,34 @@ class CourseCatalogCategoryView(APIView):
             status=status.HTTP_200_OK,
         )
 
+def failure_response(message, *, detail=None):
+    """خطای قابل‌پیش‌بینی: HTTP 200 با success=false (قرارداد پروژه)."""
+    return APIResponse(
+        success=False,
+        called_by="webapp",
+        message=message,
+        detail=detail,
+        status=status.HTTP_200_OK,
+    )
+
+
+def first_error_message(errors, default="اطلاعات ارسالی معتبر نیست."):
+    """اولین پیام خطای serializer برای نمایش به کاربر."""
+    if isinstance(errors, dict):
+        for value in errors.values():
+            message = first_error_message(value, default=None)
+            if message:
+                return message
+    elif isinstance(errors, (list, tuple)):
+        for value in errors:
+            message = first_error_message(value, default=None)
+            if message:
+                return message
+    elif errors:
+        return str(errors)
+    return default
+
+
 class HomeworkSubmissionView(
     APIView
 ):
@@ -264,48 +319,42 @@ class HomeworkSubmissionView(
         request,
         session_id,
     ):
-        session = get_object_or_404(
+        """(session, None) یا (None, پاسخ خطا)"""
+        session = (
             CourseSession.objects
             .select_related(
                 "season__course",
-            ),
-            pk=session_id,
+            )
+            .filter(pk=session_id)
+            .first()
         )
+
+        if session is None:
+            return None, failure_response("جلسه پیدا نشد.")
 
         if not session.has_homework:
-            raise ValidationError(
-                "این جلسه تمرین ندارد."
-            )
+            return None, failure_response("این جلسه تمرین ندارد.")
 
-        has_access = (
-            RequestedProduct.objects
-            .filter(
-                course=session.season.course,
-                order__student=request.user,
-                order__status=(
-                    Order.STATUS.APPROVED
-                ),
-                order__is_deleted=False,
-            )
-            .exists()
-        )
+        if not has_purchased_course(
+            request.user,
+            session.season.course,
+        ):
+            return None, failure_response("به این دوره دسترسی ندارید.")
 
-        if not has_access:
-            raise PermissionDenied(
-                "به این دوره دسترسی ندارید."
-            )
-
-        return session
+        return session, None
 
     def get(
         self,
         request,
         session_id,
     ):
-        session = self.get_session(
+        session, error = self.get_session(
             request,
             session_id,
         )
+
+        if error:
+            return error
 
         submission = (
             CourseSessionHomeworkSubmission
@@ -355,10 +404,13 @@ class HomeworkSubmissionView(
         request,
         session_id,
     ):
-        session = self.get_session(
+        session, error = self.get_session(
             request,
             session_id,
         )
+
+        if error:
+            return error
 
         submission = (
             CourseSessionHomeworkSubmission
@@ -377,7 +429,7 @@ class HomeworkSubmissionView(
             == CourseSessionHomeworkSubmission
             .STATUS.REVIEWED
         ):
-            raise ValidationError(
+            return failure_response(
                 "این تمرین بررسی شده و "
                 "دیگر قابل ویرایش نیست."
             )
@@ -392,9 +444,11 @@ class HomeworkSubmissionView(
             )
         )
 
-        serializer.is_valid(
-            raise_exception=True,
-        )
+        if not serializer.is_valid():
+            return failure_response(
+                first_error_message(serializer.errors),
+                detail=serializer.errors,
+            )
 
         created = submission is None
 
@@ -429,6 +483,7 @@ class HomeworkSubmissionView(
             ),
         )
 
+
 class CourseDetailView(APIView):
     permission_classes = [
         IsAuthenticated,
@@ -459,9 +514,7 @@ class CourseDetailView(APIView):
                     ),
                     distinct=True,
                 ),
-                total_duration=Sum(
-                    "seasons__sessions__duration",
-                ),
+                total_duration=course_total_duration(),
             )
             .prefetch_related(
                 "categories",
@@ -482,10 +535,10 @@ class CourseDetailView(APIView):
             )
         )
 
-        course = get_object_or_404(
-            queryset,
-            slug=slug,
-        )
+        course = queryset.filter(slug=slug).first()
+
+        if course is None:
+            return failure_response("دوره پیدا نشد.")
 
         course_access = can_access_course(
             user,
@@ -496,18 +549,32 @@ class CourseDetailView(APIView):
         if not course_access and not (
             course.is_published and course.can_sale
         ):
-            raise PermissionDenied(
+            return failure_response(
                 "به این دوره دسترسی ندارید."
             )
 
         # has_access در خروجی یعنی «امکان مشاهدهٔ کامل دوره»
         course.has_access = course_access
+        course.watched_percent = (
+            round(course.completed_sessions * 100 / course.all_sessions)
+            if course.all_sessions
+            else 0
+        )
+
+        progress_by_session = {
+            progress.session_id: progress
+            for progress in CourseSessionProgress.objects.filter(
+                user=user,
+                session__season__course=course,
+            )
+        }
 
         serializer = CourseDetailSerializer(
             course,
             context={
                 "request": request,
                 "can_access_course": course_access,
+                "progress_by_session": progress_by_session,
             },
         )
 
@@ -528,24 +595,31 @@ class SessionSourceCodeView(APIView):
     ]
 
     def get(self, request, session_id):
-        session = get_object_or_404(
-            CourseSession.objects.select_related(
-                "season__course",
-            ),
-            pk=session_id,
+        session = (
+            CourseSession.objects
+            .select_related("season__course")
+            .filter(pk=session_id)
+            .first()
         )
 
+        if session is None:
+            return failure_response("جلسه پیدا نشد.")
+
         if not can_access_session(request.user, session):
-            raise PermissionDenied(
-                "به این جلسه دسترسی ندارید."
-            )
+            return failure_response("به این جلسه دسترسی ندارید.")
 
         if not session.source_code:
-            raise Http404("این جلسه سورس کد ندارد.")
+            return failure_response("این جلسه سورس کد ندارد.")
 
         try:
             file = session.source_code.open("rb")
         except FileNotFoundError:
+            # فایل در دیتابیس ثبت شده ولی روی دیسک نیست: مشکل واقعی سرور
+            logger.error(
+                "Source code file missing for session %s: %s",
+                session.pk,
+                session.source_code.name,
+            )
             raise Http404("فایل سورس کد پیدا نشد.")
 
         return FileResponse(
@@ -563,10 +637,8 @@ class MyCourseHomeworkView(APIView):
     def get(self, request):
         course_id = request.query_params.get("course")
 
-        if not course_id:
-            raise ValidationError(
-                "شناسه دوره الزامی است."
-            )
+        if not course_id or not str(course_id).isdigit():
+            return failure_response("شناسه دوره الزامی است.")
 
         submissions = (
             CourseSessionHomeworkSubmission.objects
@@ -659,5 +731,112 @@ class GiftVideoDetailView(APIView):
             called_by="webapp",
             message="ویدئوی هدیه با موفقیت دریافت شد.",
             data=serializer.data,
+            status=status.HTTP_200_OK,
+        )
+
+
+class SessionWatchStartView(APIView):
+    """شروع یک نوبت تماشا؛ موقعیت ادامهٔ پخش را برمی‌گرداند."""
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def post(self, request, session_id):
+        session = (
+            CourseSession.objects
+            .select_related("season__course")
+            .filter(pk=session_id)
+            .first()
+        )
+
+        if session is None:
+            return failure_response("جلسه پیدا نشد.")
+
+        if not can_access_session(request.user, session):
+            return failure_response("به این جلسه دسترسی ندارید.")
+
+        watch, progress = watch_service.start_watch(
+            user=request.user,
+            session=session,
+            auth_session_id=request.auth.get("sid") if request.auth else None,
+        )
+
+        duration_ms = watch_service.session_duration_ms(session)
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="تماشا ثبت شد.",
+            data={
+                "watch_id": str(watch.pk),
+                "resume_position_ms": progress.last_position_ms,
+                "completed": progress.completed_at is not None,
+                "watched_percent": watch_service.progress_percent(
+                    progress,
+                    duration_ms,
+                ),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class WatchEventsView(APIView):
+    """دریافت batch رویدادها و بازه‌های دیده‌شدهٔ یک نوبت تماشا."""
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def post(self, request, watch_id):
+        watch = (
+            CourseSessionWatch.objects
+            .select_related("progress__session__season__course")
+            .filter(
+                pk=watch_id,
+                progress__user=request.user,
+            )
+            .first()
+        )
+
+        if watch is None:
+            return failure_response("نوبت تماشا پیدا نشد.")
+
+        # اگر دسترسی در این فاصله گرفته شده باشد (مثلاً سفارش لغو شده)
+        if not can_access_session(request.user, watch.progress.session):
+            return failure_response("به این جلسه دسترسی ندارید.")
+
+        serializer = WatchBatchInputSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return failure_response(
+                first_error_message(serializer.errors),
+                detail=serializer.errors,
+            )
+
+        data = serializer.validated_data
+
+        state = watch_service.record_watch_batch(
+            watch=watch,
+            events=data["events"],
+            ranges=data["ranges"],
+            position_ms=data["position_ms"],
+            client_duration_ms=data.get("duration_ms"),
+            end_reason=data.get("end_reason"),
+        )
+
+        if state is None:
+            return failure_response("این نوبت تماشا بسته شده است.")
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="پیشرفت ثبت شد.",
+            data={
+                "unique_watched_ms": state.unique_watched_ms,
+                "watched_percent": state.watched_percent,
+                "last_position_ms": state.last_position_ms,
+                "completed": state.completed,
+            },
             status=status.HTTP_200_OK,
         )

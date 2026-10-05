@@ -337,19 +337,32 @@ class ProfilePicturesView(APIView):
         )
 
     def post(self, request):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        from aiohoush.utilities.uploads import validate_profile_picture
+
         from .models import UserProfilePicture
         from .serializers import ProfilePictureSerializer
+
         picture = request.FILES.get("picture")
         if not picture:
             return APIResponse(
                 success=False, message="فایل تصویر ارسال نشده است.",
-                called_by="webapp", status=status.HTTP_400_BAD_REQUEST,
+                called_by="webapp", status=status.HTTP_200_OK,
             )
-        if not picture.content_type.startswith("image/"):
+
+        # نوع تصویر از روی محتوا تشخیص داده می‌شود، نه Content-Type
+        # یا پسوندی که کاربر فرستاده.
+        try:
+            extension = validate_profile_picture(picture)
+        except DjangoValidationError as exc:
             return APIResponse(
-                success=False, message="فرمت تصویر معتبر نیست.",
-                called_by="webapp", status=status.HTTP_400_BAD_REQUEST,
+                success=False, message=exc.messages[0],
+                called_by="webapp", status=status.HTTP_200_OK,
             )
+
+        picture.name = f"avatar{extension}"
+
         obj = UserProfilePicture.objects.create(user=request.user, picture=picture)
         return APIResponse(
             success=True, message="تصویر با موفقیت آپلود شد.", called_by="webapp",
@@ -369,7 +382,7 @@ class ProfilePictureDeleteView(APIView):
         if picture is None:
             return APIResponse(
                 success=False, message="تصویر پیدا نشد.", called_by="webapp",
-                status=status.HTTP_404_NOT_FOUND,
+                status=status.HTTP_200_OK,
             )
         picture.is_deleted = True
         picture.save(update_fields=("is_deleted",))

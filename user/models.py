@@ -15,12 +15,14 @@ def user_avatar_upload_to(
     instance,
     filename,
 ):
-    filename = Path(filename).name
+    # نام اصلی فایل کنار گذاشته می‌شود؛ پسوند از قبل توسط
+    # validate_profile_picture از روی محتوای تصویر تعیین شده است.
+    extension = Path(filename).suffix.lower()
 
     return (
         "avatars/"
         f"{instance.user.mobile}/"
-        f"{uuid.uuid4().hex}_{filename}"
+        f"{uuid.uuid4().hex}{extension}"
     )
 
 class UserManager(BaseUserManager):

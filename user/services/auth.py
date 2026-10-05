@@ -41,6 +41,14 @@ class AuthSessionNotFound(APIException):
     default_code = "session_not_found"
 
 
+class CannotRevokeCurrentSession(APIException):
+    status_code = status.HTTP_200_OK
+    default_detail = _(
+        "برای خروج از همین دستگاه از گزینهٔ خروج استفاده کنید."
+    )
+    default_code = "cannot_revoke_current_session"
+
+
 @transaction.atomic
 def login_with_otp(
     *,
@@ -175,8 +183,16 @@ def logout_all_sessions(
 def revoke_other_session(
     *,
     user: User,
+    current_session_id: str | None,
     target_session_id: UUID,
 ) -> None:
+    # نشست فعلی باید با logout بسته شود تا BFF هم کوکی و
+    # Redis را پاک کند؛ وگرنه کاربر با نشستی نیمه‌باطل می‌ماند.
+    if (
+        current_session_id
+        and str(current_session_id) == str(target_session_id)
+    ):
+        raise CannotRevokeCurrentSession
 
     session = (
         AuthSession.objects

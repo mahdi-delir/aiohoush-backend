@@ -392,8 +392,11 @@ class AIProductCheckoutView(APIView):
         product = AI_PRODUCTS.get(product_code)
 
         if product is None:
-            raise ValidationError(
-                "محصول انتخاب‌شده معتبر نیست."
+            return APIResponse(
+                success=False,
+                called_by="webapp",
+                message="محصول انتخاب‌شده معتبر نیست.",
+                status=status.HTTP_200_OK,
             )
 
         order = AIProductOrder.objects.create(

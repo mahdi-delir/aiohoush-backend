@@ -37,11 +37,13 @@ def homework_submission_upload_to(
 ):
     filename = Path(filename).name
 
+    # شماره موبایل در مسیر فایل نمی‌آید؛ پوشهٔ تصادفی آدرس را
+    # غیرقابل حدس می‌کند.
     return (
         "homework_submissions/"
-        f"{instance.student.mobile}/"
         f"{instance.session_id}/"
-        f"{uuid.uuid4().hex}_{filename}"
+        f"{uuid.uuid4().hex}/"
+        f"{filename}"
     )
 
 def course_poster_upload_to(
