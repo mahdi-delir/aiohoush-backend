@@ -66,3 +66,22 @@ def postal_code_validator(postal_code):
             _("کد پستی معتبر نیست."),
             code="invalid_postal_code",
         )
+
+TELEGRAM_ID_REGEX = re.compile(r"[A-Za-z][A-Za-z0-9_]{4,31}")
+
+
+def normalize_telegram_id(value):
+    """@name و لینک t.me/name را به name تبدیل می‌کند."""
+    value = (value or "").strip()
+    for prefix in ("https://t.me/", "http://t.me/", "t.me/", "@"):
+        if value.lower().startswith(prefix):
+            value = value[len(prefix):]
+    return value.strip("/")
+
+
+def telegram_id_validator(value):
+    if not TELEGRAM_ID_REGEX.fullmatch(value or ""):
+        raise ValidationError(
+            _("آی‌دی تلگرام معتبر نیست؛ ۵ تا ۳۲ حرف انگلیسی، عدد یا _ و شروع با حرف."),
+            code="invalid_telegram_id",
+        )

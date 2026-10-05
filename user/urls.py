@@ -12,6 +12,9 @@ from .views import (
     ProfileView,
     ProfilePicturesView,
     ProfilePictureDeleteView,
+    MyMentorView,
+    MyMentorReviewView,
+    MentorRequestView,
     )
 
 
@@ -59,4 +62,7 @@ urlpatterns = [
     path("profile/", ProfileView.as_view(), name="profile"),
     path("profile/pictures/", ProfilePicturesView.as_view(), name="profile-pictures"),
     path("profile/pictures/<int:picture_id>/", ProfilePictureDeleteView.as_view(), name="profile-picture-delete"),
+    path("my-mentor/", MyMentorView.as_view(), name="my-mentor"),
+    path("my-mentor/reviews/", MyMentorReviewView.as_view(), name="my-mentor-review"),
+    path("my-mentor/request/", MentorRequestView.as_view(), name="my-mentor-request"),
 ]

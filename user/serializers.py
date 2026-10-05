@@ -177,13 +177,37 @@ class MeResponseSerializer(serializers.Serializer):
     )
     user_data = UserDataSerializer()
 class ProfileSerializer(serializers.ModelSerializer):
+    # validator مدل بعد از نرمال‌سازی (حذف @ و لینک t.me) اجرا می‌شود.
+    telegram_id = serializers.CharField(
+        max_length=64,
+        required=False,
+        allow_blank=True,
+        allow_null=True,
+    )
+
     class Meta:
         model = User
         fields = (
             "id", "first_name", "last_name", "mobile", "email",
-            "national_id", "address", "bio", "is_profile_completed",
+            "national_id", "telegram_id", "address", "bio", "is_profile_completed",
         )
         read_only_fields = ("id", "mobile", "is_profile_completed")
+
+    def validate_telegram_id(self, value):
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        from aiohoush.utilities.validators import (
+            normalize_telegram_id,
+            telegram_id_validator,
+        )
+
+        value = normalize_telegram_id(value)
+        if not value:
+            return None
+        try:
+            telegram_id_validator(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages)
+        return value
 
     def validate_email(self, value):
         return value or None

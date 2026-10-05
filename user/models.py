@@ -8,7 +8,7 @@ from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 
 from aiohoush.utilities.normalizers import normalize_mobile_to_09
-from aiohoush.utilities.validators import mobile_validator, national_id_validator, postal_code_validator
+from aiohoush.utilities.validators import mobile_validator, national_id_validator, postal_code_validator, telegram_id_validator
 # Create your models here.
 
 def user_avatar_upload_to(
@@ -111,6 +111,15 @@ class User(AbstractBaseUser, PermissionsMixin):
         blank=True,
         null=True,
         verbose_name=_('بیوگرافی')
+    )
+
+    telegram_id = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        validators=[telegram_id_validator],
+        verbose_name=_('آی‌دی تلگرام'),
+        help_text=_('بدون @؛ مثلاً aiohoush'),
     )
 
     postal_code = models.CharField(
@@ -340,3 +349,98 @@ class AuthSession(models.Model):
     def __str__(self):
         return f"{self.user} - {self.id}"
 
+
+class MentorReview(models.Model):
+    """نظر و امتیاز دانشجو به منتور فعلی‌اش؛ هر دانشجو یک نظر برای هر منتور."""
+
+    mentor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='mentor_reviews_received',
+        verbose_name=_('منتور'),
+    )
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='mentor_reviews_written',
+        verbose_name=_('دانشجو'),
+    )
+    rating = models.PositiveSmallIntegerField(
+        verbose_name=_('امتیاز'),
+    )
+    text = models.TextField(
+        blank=True,
+        max_length=1000,
+        verbose_name=_('متن نظر'),
+    )
+    # فعلاً نظرها بلافاصله منتشر می‌شوند؛ برای بررسی در آینده.
+    is_published = models.BooleanField(
+        default=True,
+        verbose_name=_('منتشر شده'),
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('زمان ثبت'))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_('آخرین تغییر'))
+
+    class Meta:
+        verbose_name = _('نظر دربارهٔ منتور')
+        verbose_name_plural = _('نظرهای دربارهٔ منتور')
+        ordering = ('-created_at',)
+        constraints = [
+            models.UniqueConstraint(
+                fields=['mentor', 'student'],
+                name='unique_review_per_student_mentor',
+            ),
+            models.CheckConstraint(
+                condition=models.Q(rating__gte=1, rating__lte=5),
+                name='mentor_review_rating_1_5',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.student} → {self.mentor}: {self.rating}"
+
+
+class MentorRequest(models.Model):
+    """درخواست دانشجوی بدون منتور برای تعیین منتور."""
+
+    class STATUS(models.TextChoices):
+        OPEN = 'open', _('در انتظار')
+        DONE = 'done', _('رسیدگی شده')
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='mentor_requests',
+        verbose_name=_('دانشجو'),
+    )
+    status = models.CharField(
+        max_length=10,
+        choices=STATUS.choices,
+        default=STATUS.OPEN,
+        verbose_name=_('وضعیت'),
+    )
+    handled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name='handled_mentor_requests',
+        blank=True,
+        null=True,
+        verbose_name=_('رسیدگی کننده'),
+    )
+    handled_at = models.DateTimeField(blank=True, null=True, verbose_name=_('زمان رسیدگی'))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_('زمان درخواست'))
+
+    class Meta:
+        verbose_name = _('درخواست منتور')
+        verbose_name_plural = _('درخواست‌های منتور')
+        ordering = ('-created_at',)
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student'],
+                condition=models.Q(status='open'),
+                name='unique_open_mentor_request',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.student} ({self.get_status_display()})"

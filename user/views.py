@@ -389,3 +389,155 @@ class ProfilePictureDeleteView(APIView):
         return APIResponse(
             success=True, message="تصویر حذف شد.", called_by="webapp", data={},
         )
+
+
+def _mentor_failure(message):
+    return APIResponse(
+        success=False,
+        called_by="webapp",
+        message=message,
+        status=status.HTTP_200_OK,
+    )
+
+
+def _review_row(review):
+    from .services.mentor import full_name
+
+    return {
+        "id": review.pk,
+        "authorName": full_name(review.student),
+        "rating": review.rating,
+        "text": review.text,
+        "createdAt": review.created_at.isoformat(),
+    }
+
+
+class MyMentorView(APIView):
+    """منتور فعلی دانشجو، نظرهای همهٔ دانشجویان او و وضعیت درخواست منتور."""
+
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request):
+        from .models import MentorRequest, MentorReview
+        from .services.mentor import avatar_url, full_name, get_active_mentor
+
+        student = request.user
+        mentor = get_active_mentor(student)
+
+        open_request = (
+            MentorRequest.objects
+            .filter(student=student, status=MentorRequest.STATUS.OPEN)
+            .first()
+        )
+
+        if mentor is None:
+            return APIResponse(
+                success=True,
+                called_by="webapp",
+                message="منتوری برای شما تعیین نشده است.",
+                data={
+                    "mentor": None,
+                    "reviews": [],
+                    "myReview": None,
+                    "mentorRequest": (
+                        {"createdAt": open_request.created_at.isoformat()}
+                        if open_request
+                        else None
+                    ),
+                },
+            )
+
+        reviews = list(
+            MentorReview.objects
+            .filter(mentor=mentor, is_published=True)
+            .select_related("student")
+            .order_by("-created_at")
+        )
+        my_review = next(
+            (review for review in reviews if review.student_id == student.pk),
+            None,
+        ) or (
+            MentorReview.objects
+            .filter(mentor=mentor, student=student)
+            .select_related("student")
+            .first()
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="اطلاعات منتور دریافت شد.",
+            data={
+                "mentor": {
+                    "id": mentor.pk,
+                    "name": full_name(mentor),
+                    # فیلدهای عنوان و تخصص هنوز در مدل نیستند.
+                    "headline": "",
+                    "specialties": [],
+                    "bio": mentor.bio or "",
+                    "avatarUrl": avatar_url(mentor, request),
+                    "mobile": mentor.mobile,
+                    "telegramId": mentor.telegram_id or None,
+                },
+                "reviews": [_review_row(review) for review in reviews],
+                "myReview": _review_row(my_review) if my_review else None,
+                "mentorRequest": None,
+            },
+        )
+
+
+class MyMentorReviewView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        from .services.mentor import MentorActionError, submit_review
+
+        try:
+            rating = int(request.data.get("rating"))
+        except (TypeError, ValueError):
+            return _mentor_failure("امتیاز را از ۱ تا ۵ انتخاب کنید.")
+
+        if not 1 <= rating <= 5:
+            return _mentor_failure("امتیاز را از ۱ تا ۵ انتخاب کنید.")
+
+        text = request.data.get("text") or ""
+        if not isinstance(text, str):
+            return _mentor_failure("متن نظر معتبر نیست.")
+        if len(text.strip()) > 1000:
+            return _mentor_failure("متن نظر نباید بیشتر از ۱۰۰۰ حرف باشد.")
+
+        try:
+            review = submit_review(
+                student=request.user,
+                rating=rating,
+                text=text,
+            )
+        except MentorActionError as exc:
+            return _mentor_failure(str(exc))
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="نظر شما ثبت شد.",
+            data=_review_row(review),
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MentorRequestView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def post(self, request):
+        from .services.mentor import MentorActionError, request_mentor
+
+        try:
+            mentor_request = request_mentor(student=request.user)
+        except MentorActionError as exc:
+            return _mentor_failure(str(exc))
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="درخواست شما ثبت شد. به‌زودی منتور شما تعیین می‌شود.",
+            data={"createdAt": mentor_request.created_at.isoformat()},
+        )
