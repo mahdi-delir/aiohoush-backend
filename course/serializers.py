@@ -309,6 +309,7 @@ class CourseCatalogCategorySerializer(
             "id",
             "title",
             "slug",
+            "icon",
         ]
 
 class CourseCatalogSerializer(

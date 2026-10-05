@@ -19,6 +19,7 @@ class CourseCategoryAdmin(admin.ModelAdmin):
         "id",
         "title",
         "slug",
+        "icon",
         "order",
         "created_at",
     )

@@ -84,6 +84,20 @@ def gift_poster_upload_to(
     )
 
 class CourseCategory(models.Model):
+    # نام آیکون‌های موجود در فرانت (assets/puffy-icons)
+    class ICON(models.TextChoices):
+        SCHOOL = 'school', 'مدرسه (پیش‌فرض)'
+        WEB = 'web', 'وب'
+        CODE = 'code', 'کد'
+        CHATBOT = 'chatbot', 'هوش مصنوعی'
+        DRAWING = 'drawing', 'طراحی'
+        MICROPHONE = 'microphone', 'میکروفون'
+        BOOK = 'book', 'کتاب'
+        CALCULATOR = 'calculator', 'ماشین‌حساب'
+        GOOGLE = 'google', 'گوگل'
+        RESUME = 'resume', 'رزومه'
+        TRAINING = 'training', 'آموزش'
+
     title = models.CharField(
         verbose_name='دسته بندی',
         max_length=20
@@ -96,6 +110,12 @@ class CourseCategory(models.Model):
     slug = models.SlugField(
         unique=True,
         verbose_name='اسلاگ'
+    )
+    icon = models.CharField(
+        max_length=20,
+        choices=ICON.choices,
+        default=ICON.SCHOOL,
+        verbose_name='آیکون',
     )
     order = models.PositiveIntegerField(
         verbose_name='ترتیب',
