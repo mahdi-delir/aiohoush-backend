@@ -131,7 +131,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.1/howto/static-files/
 
 STATIC_URL = 'public/static/'
-MEDIA_URL = 'public/media/'
+# در production آدرس کامل عمومی را بدهید (مثلاً
+# https://api.aiohoush.com/public/media/) تا آدرس فایل‌ها به هدر Host
+# درخواستی که از سرور Next می‌رسد وابسته نباشد.
+MEDIA_URL = env.str('MEDIA_URL', default='/public/media/')
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'public', 'media')
 STATIC_ROOT = os.path.join(BASE_DIR, 'public', 'static') 
