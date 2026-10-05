@@ -287,6 +287,27 @@ AI_PAYMENT_CALLBACK_URL = env.str(
     default="https://api.aiohoush.com/order/ai-products/payment-return/",
 )
 
+# شارژ آنلاین کیف پول (ریال)
+WALLET_TOPUP_MIN_RIAL = env.int(
+    "WALLET_TOPUP_MIN_RIAL",
+    default=100_000,
+)
+
+WALLET_TOPUP_MAX_RIAL = env.int(
+    "WALLET_TOPUP_MAX_RIAL",
+    default=2_000_000_000,
+)
+
+WALLET_TOPUP_CALLBACK_URL = env.str(
+    "WALLET_TOPUP_CALLBACK_URL",
+    default="https://api.aiohoush.com/accounting/wallet/top-up/payment-return/",
+)
+
+WALLET_TOPUP_RESULT_URL = env.str(
+    "WALLET_TOPUP_RESULT_URL",
+    default=f"{APP_ORIGIN.rstrip('/')}/dashboard/wallet",
+)
+
 # صفحهٔ فرانت که نتیجهٔ پرداخت را نشان می‌دهد.
 AI_PAYMENT_RESULT_URL = env.str(
     "AI_PAYMENT_RESULT_URL",

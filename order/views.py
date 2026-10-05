@@ -34,7 +34,9 @@ from rest_framework.exceptions import ValidationError
 
 from aiohoush.core.responses import APIResponse
 
+from .services import orders as order_service
 from .services import videopol
+from accounting.services.wallet import record_ai_purchase
 
 
 logger = logging.getLogger(__name__)
@@ -121,6 +123,14 @@ class OrderManagementViewSet(
         self,
         instance,
     ):
+        if instance.status not in {
+            Order.STATUS.PENDING,
+            Order.STATUS.DRAFT,
+        }:
+            raise ValidationError(
+                "سفارش بررسی‌شده قابل حذف نیست."
+            )
+
         # Soft delete
         instance.is_deleted = True
 
@@ -136,56 +146,16 @@ class OrderManagementViewSet(
         methods=["post"],
         url_path="approve",
     )
-    @transaction.atomic
     def approve(
         self,
         request,
         pk=None,
     ):
-        order = get_object_or_404(
-            self.get_queryset()
-            .select_for_update(
-                 of=("self",)
-            ),
-            pk=pk,
-        )
-
-        self.check_object_permissions(
+        return self._change_status(
             request,
-            order,
-        )
-        if order.status != Order.STATUS.PENDING:
-            return APIResponse(
-                success=False,
-                called_by="webapp",
-                message=(
-                    "فقط سفارش در انتظار بررسی "
-                    "قابل تأیید است."
-                ),
-                status=status.HTTP_200_OK,
-            )
-
-        order.status = (
-            Order.STATUS.APPROVED
-        )
-        order.checked_by = request.user
-
-        order.save(
-            update_fields=[
-                "status",
-                "checked_by",
-                "updated_at",
-            ]
-        )
-
-        return APIResponse(
-            success=True,
-            called_by="webapp",
-            message=(
-                "سفارش با موفقیت "
-                "تأیید شد."
-            ),
-            status=status.HTTP_200_OK,
+            pk,
+            order_service.approve_order,
+            "سفارش با موفقیت تأیید شد.",
         )
 
     @action(
@@ -193,57 +163,41 @@ class OrderManagementViewSet(
         methods=["post"],
         url_path="reject",
     )
-    @transaction.atomic
     def reject(
         self,
         request,
         pk=None,
     ):
-        order = get_object_or_404(
-            self.get_queryset()
-            .select_for_update(
-                 of=("self",)
-            ),
-            pk=pk,
-        )
-
-        self.check_object_permissions(
+        return self._change_status(
             request,
-            order,
+            pk,
+            order_service.reject_order,
+            "سفارش رد شد.",
         )
 
-        if order.status != Order.STATUS.PENDING:
+    def _change_status(self, request, pk, service, success_message):
+        # دسترسی به سفارش از همان queryset فروشنده/مدیر بررسی می‌شود.
+        order = get_object_or_404(self.get_queryset(), pk=pk)
+
+        self.check_object_permissions(request, order)
+
+        try:
+            service(order_id=order.pk, by=request.user)
+        except order_service.OrderActionError as exc:
             return APIResponse(
                 success=False,
                 called_by="webapp",
-                message=(
-                    "فقط سفارش در انتظار بررسی "
-                    "قابل رد است."
-                ),
+                message=str(exc),
                 status=status.HTTP_200_OK,
             )
-
-        order.status = (
-            Order.STATUS.REJECTED
-        )
-        order.checked_by = request.user
-
-        order.save(
-            update_fields=[
-                "status",
-                "checked_by",
-                "updated_at",
-            ]
-        )
 
         return APIResponse(
             success=True,
             called_by="webapp",
-            message=(
-                "سفارش رد شد."
-            ),
+            message=success_message,
             status=status.HTTP_200_OK,
         )
+
     @action(
     detail=False,
     methods=["get"],
@@ -559,6 +513,13 @@ def apply_videopol_payment_status(
                 "paid_at",
                 "updated_at",
             ]
+        )
+
+        # واریز درگاه و خرید محصول در کیف پول کاربر
+        product = AI_PRODUCTS.get(order.product_code, {})
+        record_ai_purchase(
+            ai_order=order,
+            product_title=product.get("title", order.product_code),
         )
         return "paid"
 

@@ -193,6 +193,15 @@ class OrderSerializer(
         instance,
         validated_data,
     ):
+        # سفارش بررسی‌شده سند کیف پول دارد و دیگر تغییر نمی‌کند.
+        if instance.status not in {
+            Order.STATUS.PENDING,
+            Order.STATUS.DRAFT,
+        }:
+            raise serializers.ValidationError(
+                "سفارش بررسی‌شده قابل ویرایش نیست."
+            )
+
         items = validated_data.pop(
             "items",
             None,

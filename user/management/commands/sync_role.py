@@ -127,6 +127,8 @@ GROUP_PERMISSIONS = {
         "accounting.view_payment",
         "accounting.add_payment",
         "accounting.change_payment",
+        "accounting.confirm_payment",
+        "accounting.view_walletentry",
         "order.view_all_orders",
         "order.approve_order",
         "order.reject_order",

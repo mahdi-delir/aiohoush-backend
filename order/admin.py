@@ -1,5 +1,10 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
+from order.services.orders import (
+    OrderActionError,
+    approve_order,
+    reject_order,
+)
 from order.models import (
     AIProductOrder,
     Order,
@@ -8,9 +13,23 @@ from order.models import (
 )
 
 
+def _order_is_locked(order) -> bool:
+    """اقلام سفارش بعد از بررسی تغییر نمی‌کنند؛ سند کیف پول بر اساس آن‌هاست."""
+    return order is not None and order.status != Order.STATUS.PENDING
+
+
 class RequestedProductInline(admin.TabularInline):
     model = RequestedProduct
     extra = 0
+
+    def has_add_permission(self, request, obj=None):
+        return not _order_is_locked(obj) and super().has_add_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        return not _order_is_locked(obj) and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return not _order_is_locked(obj) and super().has_delete_permission(request, obj)
 
     autocomplete_fields = (
         "course",
@@ -93,9 +112,78 @@ class OrderAdmin(admin.ModelAdmin):
         OrderCommentInline,
     )
 
+    # وضعیت فقط با اکشن تأیید/رد عوض می‌شود تا سند خرید در کیف پول
+    # دانشجو ثبت شود.
+    readonly_fields = (
+        "status",
+        "checked_by",
+    )
+
+    actions = (
+        "approve_selected",
+        "reject_selected",
+    )
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def _change_status(self, request, queryset, permission, service, done_message):
+        if not request.user.has_perm(permission):
+            self.message_user(
+                request,
+                "اجازهٔ این کار را ندارید.",
+                level=messages.ERROR,
+            )
+            return
+
+        done = 0
+        for order in queryset:
+            try:
+                service(order_id=order.pk, by=request.user)
+                done += 1
+            except OrderActionError as exc:
+                self.message_user(
+                    request,
+                    f"سفارش {order.pk}: {exc}",
+                    level=messages.WARNING,
+                )
+
+        if done:
+            self.message_user(request, done_message.format(count=done))
+
+    @admin.action(description="تأیید سفارش‌های انتخاب‌شده (کسر از کیف پول)")
+    def approve_selected(self, request, queryset):
+        self._change_status(
+            request,
+            queryset,
+            "order.approve_order",
+            approve_order,
+            "{count} سفارش تأیید شد.",
+        )
+
+    @admin.action(description="رد سفارش‌های انتخاب‌شده")
+    def reject_selected(self, request, queryset):
+        self._change_status(
+            request,
+            queryset,
+            "order.reject_order",
+            reject_order,
+            "{count} سفارش رد شد.",
+        )
+
 
 @admin.register(RequestedProduct)
 class RequestedProductAdmin(admin.ModelAdmin):
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and _order_is_locked(obj.order):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and _order_is_locked(obj.order):
+            return False
+        return super().has_delete_permission(request, obj)
+
     list_display = (
         "id",
         "order",
