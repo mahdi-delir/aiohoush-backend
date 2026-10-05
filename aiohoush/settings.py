@@ -255,6 +255,27 @@ VIDEOPOL_TIMEOUT_SECONDS = env.float(
     default=15,
 )
 
+# کلید مشترک بین BFF (Next.js) و جنگو. فقط درخواستی که این کلید را
+# دارد می‌تواند IP کاربر را با هدر X-Aiohoush-Client-IP اعلام کند.
+# خالی = به هیچ IP اعلام‌شده‌ای اعتماد نمی‌شود.
+BFF_SHARED_SECRET = env.str(
+    "BFF_SHARED_SECRET",
+    default="",
+)
+
+# هدری که proxy جلوی جنگو IP کاربر را در آن می‌گذارد:
+# HTTP_X_REAL_IP یا HTTP_X_FORWARDED_FOR. خالی = REMOTE_ADDR.
+CLIENT_IP_META_KEY = env.str(
+    "CLIENT_IP_META_KEY",
+    default="",
+)
+
+# فقط برای HTTP_X_FORWARDED_FOR: تعداد proxyهای مورد اعتماد.
+TRUSTED_PROXY_COUNT = env.int(
+    "TRUSTED_PROXY_COUNT",
+    default=1,
+)
+
 APP_ORIGIN = env.str(
     "APP_ORIGIN",
 )

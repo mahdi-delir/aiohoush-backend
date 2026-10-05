@@ -156,6 +156,7 @@ class AIProductOrderAdmin(admin.ModelAdmin):
         "reference_id",
         "paid_at",
         "created_at",
+        'videopol_payment_id'
     )
 
     list_filter = (

@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 from django.http import HttpRequest
 
-from ipware import get_client_ip
 from rest_framework.request import Request
 
+from aiohoush.core.client_ip import get_client_ip
 from user.models import AuthSession, User
 from user.tasks import enrich_auth_session
 from django.db import transaction
@@ -20,7 +20,7 @@ class ClientInfo:
 
 
 def get_client_info(request: HttpRequest) -> ClientInfo:
-    ip_address, _ = get_client_ip(request)
+    ip_address = get_client_ip(request)
 
     user_agent = request.headers.get(
         "User-Agent",
@@ -55,14 +55,9 @@ def create_auth_session(
         device_brand="",
         device_model="",
     )
-    logger.warning("AUTH: before session save")
 
     session.full_clean()
     session.save()
-    logger.warning(
-    "AUTH: session saved %s",
-    session.id,
-)
 
     # تحلیل دستگاه بعد از ایجاد نشست انجام می‌شود
     def enqueue_device_detection(
@@ -70,19 +65,11 @@ def create_auth_session(
         session_id: str,
         user_agent: str,
     ) -> None:
-        logger.warning(
-        "AUTH: enqueue started %s",
-        session_id,
-    )
         try:
             enrich_auth_session.delay(
                 session_id=session_id,
                 user_agent=user_agent,
             )
-            logger.warning(
-            "AUTH: enqueue finished %s",
-            session_id,
-        )
         except Exception:
             logger.exception(
                 "Could not enqueue device detection for session %s",
@@ -97,9 +84,5 @@ def create_auth_session(
             user_agent=user_agent,
         )
     )
-    logger.warning(
-    "AUTH: on_commit registered %s",
-    session.id,
-)
 
     return session
