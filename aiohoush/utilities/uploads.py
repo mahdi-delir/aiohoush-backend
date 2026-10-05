@@ -81,3 +81,40 @@ def validate_profile_picture(file) -> str:
         raise ValidationError("ابعاد تصویر بیش از حد بزرگ است.")
 
     return PROFILE_PICTURE_FORMATS[image_format]
+
+
+TICKET_ATTACHMENT_MAX_BYTES = HOMEWORK_MAX_BYTES
+TICKET_ATTACHMENT_ALLOWED_EXTENSIONS = HOMEWORK_ALLOWED_EXTENSIONS
+
+VOICE_MAX_BYTES = 10 * MB
+
+# خروجی MediaRecorder: Chrome/Firefox → webm/ogg، Safari → mp4 (m4a)
+VOICE_ALLOWED_EXTENSIONS = frozenset({
+    ".webm", ".ogg", ".oga", ".m4a", ".mp4", ".mp3", ".wav", ".aac",
+})
+
+
+def validate_ticket_attachment(file) -> None:
+    if file.size > TICKET_ATTACHMENT_MAX_BYTES:
+        raise ValidationError(
+            f"حجم فایل نباید بیشتر از {_size_text(TICKET_ATTACHMENT_MAX_BYTES)} باشد."
+        )
+
+    extension = Path(file.name or "").suffix.lower()
+
+    if extension not in TICKET_ATTACHMENT_ALLOWED_EXTENSIONS:
+        raise ValidationError(
+            "این نوع فایل پذیرفته نمی‌شود. برای چند فایل، آن‌ها را zip کنید."
+        )
+
+
+def validate_voice_message(file) -> None:
+    if file.size > VOICE_MAX_BYTES:
+        raise ValidationError(
+            f"حجم پیام صوتی نباید بیشتر از {_size_text(VOICE_MAX_BYTES)} باشد."
+        )
+
+    extension = Path(file.name or "").suffix.lower()
+
+    if extension not in VOICE_ALLOWED_EXTENSIONS:
+        raise ValidationError("فرمت پیام صوتی پشتیبانی نمی‌شود.")

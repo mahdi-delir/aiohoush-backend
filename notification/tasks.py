@@ -112,3 +112,63 @@ def send_welcome_sms(
             result.trace_ids,
             result.status,
         )
+
+
+@shared_task(ignore_result=True)
+def send_ticket_sms(
+    *,
+    ticket_id: int,
+    event: str,
+) -> None:
+    from ticket.models import Ticket
+
+    ticket = (
+        Ticket.objects
+        .select_related("student")
+        .filter(pk=ticket_id)
+        .first()
+    )
+
+    if ticket is None:
+        logger.warning("Ticket SMS skipped; ticket %s not found.", ticket_id)
+        return
+
+    link = f"{settings.APP_ORIGIN.rstrip('/')}/dashboard/tickets/{ticket.pk}"
+
+    if event == "created":
+        text = (
+            f"تیکت شما با شماره {ticket.pk} در آیوهوش ثبت شد و به‌زودی پاسخ داده می‌شود.\n{link}"
+        )
+    elif event == "answered":
+        text = f"به تیکت شماره {ticket.pk} شما در آیوهوش پاسخ داده شد.\n{link}"
+    else:
+        raise ValueError(f"Unknown ticket SMS event: {event}")
+
+    prepared_messages = prepare_sms_messages(
+        messages=[
+            OutgoingSMS(
+                recipient=ticket.student.mobile,
+                text=text,
+            )
+        ],
+    )
+
+    result = send_sms_requests(messages=prepared_messages)[0]
+
+    if result.status != SMSServerResponse.SMSSTATUS.SENT:
+        logger.warning(
+            "Ticket SMS not sent. ticket=%s event=%s status=%s",
+            ticket.pk,
+            event,
+            result.status,
+        )
+
+
+@shared_task(ignore_result=True)
+def close_stale_tickets_task() -> None:
+    """برای اجرای دوره‌ای (celery beat یا cron)."""
+    from ticket.services.tickets import close_stale_tickets
+
+    closed = close_stale_tickets()
+    if closed:
+        logger.info("Closed %s stale tickets.", closed)
