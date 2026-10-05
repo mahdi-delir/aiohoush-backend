@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.db import transaction
+from django.core.exceptions import ValidationError as DjangoValidationError
 
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
@@ -15,24 +16,39 @@ from rest_framework_simplejwt.exceptions import (
 from rest_framework_simplejwt.settings import api_settings
 
 
+from aiohoush.utilities.normalizers import normalize_mobile_to_09
+
 from .models import User, AuthSession, UserProfilePicture
 
 mobile_model_field = User._meta.get_field("mobile")
 
 
+class MobileField(serializers.CharField):
+    """شماره موبایل را به شکل استاندارد 09xxxxxxxxx تبدیل می‌کند.
+
+    9121234567، 09121234567، 989121234567، +989121234567 و شکل فارسی
+    ارقام همه یک کاربر حساب می‌شوند.
+    """
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("validators", list(mobile_model_field.validators))
+        kwargs.setdefault("trim_whitespace", False)
+        super().__init__(**kwargs)
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+
+        try:
+            return normalize_mobile_to_09(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
+
+
 class LoginOTPRequestSerializer(serializers.Serializer):
-    mobile = serializers.CharField(
-        max_length=mobile_model_field.max_length,
-        validators=list(mobile_model_field.validators),
-        trim_whitespace=False,
-    )
+    mobile = MobileField()
 
 class LoginOTPVerifySerializer(serializers.Serializer):
-    mobile = serializers.CharField(
-        max_length=mobile_model_field.max_length,
-        validators=list(mobile_model_field.validators),
-        trim_whitespace=False,
-    )
+    mobile = MobileField()
 
     code = serializers.RegexField(
         regex=rf"^\d{{{settings.OTP_LENGTH}}}$",

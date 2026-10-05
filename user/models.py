@@ -2,6 +2,7 @@ import uuid
 
 from pathlib import Path
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
 from django.utils.translation import gettext_lazy as _
@@ -152,6 +153,28 @@ class User(AbstractBaseUser, PermissionsMixin):
             part for part in (self.first_name, self.last_name) if part
         )
         return f"{self.mobile} - {full_name}" if full_name else self.mobile
+
+    @classmethod
+    def normalize_username(cls, username):
+        # clean() جنگو (فرم‌ها و full_clean) از این استفاده می‌کند؛
+        # 912... و 0912... یک کاربر هستند.
+        username = super().normalize_username(username)
+        try:
+            return normalize_mobile_to_09(username)
+        except ValidationError:
+            return username
+
+    def save(self, *args, **kwargs):
+        # آخرین سد: هر مسیری که کاربر را ذخیره کند (shell، اسکریپت،
+        # کد آینده) شماره را به شکل 09xxxxxxxxx ذخیره می‌کند.
+        if self.mobile:
+            normalized = self.normalize_username(self.mobile)
+            if normalized != self.mobile:
+                self.mobile = normalized
+                update_fields = kwargs.get("update_fields")
+                if update_fields is not None:
+                    kwargs["update_fields"] = {*update_fields, "mobile"}
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = _("کاربر")
