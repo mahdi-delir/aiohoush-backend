@@ -133,6 +133,10 @@ class CourseCategory(models.Model):
     def __str__(self):
         return self.title
 
+    class Meta:
+        verbose_name = "دسته‌بندی دوره"
+        verbose_name_plural = "دسته‌بندی‌های دوره"
+
 class Course(models.Model):
     class LEVEL(models.TextChoices):
         BEGINNER = 'beginner', 'مبتدی'
@@ -236,6 +240,9 @@ class Course(models.Model):
     def __str__(self):
         return self.title
     class Meta:
+        verbose_name = "دوره"
+        verbose_name_plural = "دوره‌ها"
+
         permissions = [
             (
                 "publish_course",
@@ -296,6 +303,9 @@ class CourseSeason(models.Model):
         auto_now=True
     )
     class Meta:
+        verbose_name = "فصل دوره"
+        verbose_name_plural = "فصل‌های دوره"
+
         constraints = [
             models.UniqueConstraint(
                 fields=["course", "order"],
@@ -377,6 +387,9 @@ class CourseSession(models.Model):
         auto_now=True
     )
     class Meta:
+        verbose_name = "جلسهٔ دوره"
+        verbose_name_plural = "جلسات دوره"
+
         constraints = [
             models.UniqueConstraint(
                 fields=["season", "order"],
@@ -460,6 +473,9 @@ class CourseSessionProgress(models.Model):
     )
 
     class Meta:
+        verbose_name = "پیشرفت جلسه"
+        verbose_name_plural = "پیشرفت جلسات"
+
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "session"],
@@ -544,6 +560,9 @@ class CourseSessionWatch(models.Model):
     )
 
     class Meta:
+        verbose_name = "نوبت تماشای جلسه"
+        verbose_name_plural = "نوبت‌های تماشای جلسات"
+
         indexes = [
             models.Index(
                 fields=[
@@ -630,6 +649,9 @@ class CourseSessionWatchEvent(models.Model):
     )
 
     class Meta:
+        verbose_name = "رویداد تماشا"
+        verbose_name_plural = "رویدادهای تماشا"
+
         constraints = [
             models.UniqueConstraint(
                 fields=["watch", "sequence"],
@@ -669,6 +691,9 @@ class CourseSessionWatchedRange(models.Model):
     )
 
     class Meta:
+        verbose_name = "بازهٔ دیده‌شده"
+        verbose_name_plural = "بازه‌های دیده‌شده"
+
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(
@@ -751,6 +776,9 @@ class CourseSessionHomeworkSubmission(models.Model):
     )
 
     class Meta:
+        verbose_name = "تمرین ارسالی"
+        verbose_name_plural = "تمرین‌های ارسالی"
+
         constraints = [
             models.UniqueConstraint(
                 fields=["session", "student"],
@@ -837,6 +865,9 @@ class GiftVideo(models.Model):
     )
 
     class Meta:
+        verbose_name = "ویدئوی هدیه"
+        verbose_name_plural = "ویدئوهای هدیه"
+
         ordering = ["order", "-created_at"]
 
     def __str__(self):

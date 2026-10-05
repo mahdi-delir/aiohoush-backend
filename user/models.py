@@ -153,6 +153,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         )
         return f"{self.mobile} - {full_name}" if full_name else self.mobile
 
+    class Meta:
+        verbose_name = _("کاربر")
+        verbose_name_plural = _("کاربران")
+
 class UserProfilePicture(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -178,6 +182,10 @@ class UserProfilePicture(models.Model):
 
     def __str__(self):
         return f"عکس پروفایل {self.user}"
+
+    class Meta:
+        verbose_name = _("عکس پروفایل")
+        verbose_name_plural = _("عکس‌های پروفایل")
 
 class ReferralCode(models.Model):
     owner = models.ForeignKey(
@@ -209,6 +217,10 @@ class ReferralCode(models.Model):
         verbose_name=_('فعال بودن کد')
     )
 
+    class Meta:
+        verbose_name = _("کد معرف")
+        verbose_name_plural = _("کدهای معرف")
+
 class StudentMentorAssignment(models.Model):
     student = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='mentor_assignments', verbose_name=_('دانش آموز'))
     mentor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='mentored_students_history', verbose_name=_('منتور'))
@@ -226,6 +238,9 @@ class StudentMentorAssignment(models.Model):
     is_active = models.BooleanField(default=True, verbose_name=_('فعال'))
     
     class Meta:
+        verbose_name = _("تخصیص منتور")
+        verbose_name_plural = _("تخصیص‌های منتور")
+
         constraints = [
             models.CheckConstraint(
                 condition=~models.Q(student=models.F("mentor")),
@@ -348,6 +363,10 @@ class AuthSession(models.Model):
     )
     def __str__(self):
         return f"{self.user} - {self.id}"
+
+    class Meta:
+        verbose_name = _("نشست ورود")
+        verbose_name_plural = _("نشست‌های ورود")
 
 
 class MentorReview(models.Model):

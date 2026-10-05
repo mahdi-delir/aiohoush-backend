@@ -22,6 +22,10 @@ class OrderComment(models.Model):
         verbose_name = 'تاریخ ایجاد'
     )
 
+    class Meta:
+        verbose_name = "توضیح سفارش"
+        verbose_name_plural = "توضیحات سفارش"
+
 class Order(models.Model):
     class STATUS(models.TextChoices):
         PENDING = 'pending', 'در انتظار'
@@ -83,6 +87,9 @@ class Order(models.Model):
         verbose_name = 'آخرین ویرایش'
     )
     class Meta:
+        verbose_name = "سفارش"
+        verbose_name_plural = "سفارش‌ها"
+
         permissions = [
             (
                 "approve_order",
@@ -136,6 +143,9 @@ class RequestedProduct(models.Model):
         default=0
     )
     class Meta:
+        verbose_name = "دورهٔ سفارش"
+        verbose_name_plural = "دوره‌های سفارش"
+
         constraints = [
             models.UniqueConstraint(
                 fields=["order", "course"],
@@ -231,6 +241,9 @@ class AIProductOrder(models.Model):
     )
 
     class Meta:
+        verbose_name = "سفارش محصول هوش مصنوعی"
+        verbose_name_plural = "سفارش‌های محصولات هوش مصنوعی"
+
         ordering = ["-created_at"]
         indexes = [
             models.Index(

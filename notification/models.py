@@ -62,6 +62,10 @@ class SMSServerResponse(models.Model):
     def __str__(self):
         return f"{self.text} -> {self.recipient} : {self.status}"
 
+    class Meta:
+        verbose_name = _("گزارش ارسال پیامک")
+        verbose_name_plural = _("گزارش‌های ارسال پیامک")
+
 class OTPSMSToken(models.Model):
     class OTPREASON(models.TextChoices):
         LOGIN = "login", _("ورود")
@@ -108,3 +112,7 @@ class OTPSMSToken(models.Model):
 
     def __str__(self):
         return f"{self.user} -> {self.reason}"
+
+    class Meta:
+        verbose_name = _("کد یکبار مصرف")
+        verbose_name_plural = _("کدهای یکبار مصرف")

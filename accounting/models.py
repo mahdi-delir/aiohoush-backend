@@ -35,6 +35,10 @@ class BankAccount(models.Model):
         verbose_name = 'شماره حساب'
     )
 
+    class Meta:
+        verbose_name = "حساب بانکی"
+        verbose_name_plural = "حساب‌های بانکی"
+
 class Payment(models.Model):
     class STATUS(models.TextChoices):
         PENDING = 'pending', 'در انتظار تأیید'
