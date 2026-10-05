@@ -231,6 +231,7 @@ class CourseDetailInfoSerializer(
             "watched_percent",
             "price",
             "can_sale",
+            "intro_video",
         ]
 
     def get_duration(self, obj):
