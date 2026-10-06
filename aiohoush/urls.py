@@ -27,6 +27,7 @@ urlpatterns = [
     path("accounting/", include("accounting.urls")),
     path("ticket/", include("ticket.urls")),
     path("project/", include("project.urls")),
+    path("announcement/", include("announcement.urls")),
 ]
 
 # سرو فایل‌های آپلودی در محیط توسعه (DEBUG). در production این مسیر

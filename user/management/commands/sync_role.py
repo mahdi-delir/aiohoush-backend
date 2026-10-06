@@ -10,6 +10,8 @@ from django.db import transaction
 
 GROUP_PERMISSIONS = {
     "اساتید": [
+        # Announcements: خریداران دوره‌های خود استاد
+        "announcement.send_announcement_course_students",
         # Course
         "course.add_course",
         "course.change_course",
@@ -45,6 +47,8 @@ GROUP_PERMISSIONS = {
     ],
 
     "فروشنده ها": [
+        # Announcements: دانشجوهایی که منتورشان است
+        "announcement.send_announcement_mentees",
         # Needed to choose products
         "course.view_course",
 
@@ -66,6 +70,16 @@ GROUP_PERMISSIONS = {
     ],
 
     "مدیریت": [
+        # Announcements: هر مخاطبی
+        "announcement.view_announcement",
+        "announcement.add_announcement",
+        "announcement.send_announcement_all",
+        "announcement.send_announcement_groups",
+        "announcement.send_announcement_users",
+        "announcement.send_announcement_course_students",
+        "announcement.send_announcement_any_course",
+        "announcement.send_announcement_mentees",
+        "announcement.send_announcement_any_mentor",
         # Users
         "user.add_user",
         "user.change_user",
