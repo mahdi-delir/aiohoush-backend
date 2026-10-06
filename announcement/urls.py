@@ -1,6 +1,16 @@
 from django.urls import path
 
-from .views import ComposeView, InboxView, MarkAllReadView, MarkReadView, SentView, UnreadCountView
+from .views import (
+    ComposeView,
+    InboxView,
+    MarkAllReadView,
+    MarkReadView,
+    PushPublicKeyView,
+    PushSubscribeView,
+    PushUnsubscribeView,
+    SentView,
+    UnreadCountView,
+)
 
 
 urlpatterns = [
@@ -10,4 +20,7 @@ urlpatterns = [
     path("<int:announcement_id>/read/", MarkReadView.as_view(), name="announcement-read"),
     path("compose/", ComposeView.as_view(), name="announcement-compose"),
     path("sent/", SentView.as_view(), name="announcement-sent"),
+    path("push/public-key/", PushPublicKeyView.as_view(), name="push-public-key"),
+    path("push/subscribe/", PushSubscribeView.as_view(), name="push-subscribe"),
+    path("push/unsubscribe/", PushUnsubscribeView.as_view(), name="push-unsubscribe"),
 ]

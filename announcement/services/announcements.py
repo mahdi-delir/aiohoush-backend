@@ -252,6 +252,13 @@ def publish(announcement: Announcement) -> int:
 
         send_announcement_sms.delay_on_commit(announcement_id=announcement.pk)
 
+    from announcement.services import push
+
+    if ids and push.is_enabled():
+        from announcement.tasks import send_announcement_push
+
+        send_announcement_push.delay_on_commit(announcement_id=announcement.pk)
+
     return len(ids)
 
 

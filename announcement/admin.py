@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Q
 
-from .models import Announcement, AnnouncementSettings
+from .models import Announcement, AnnouncementSettings, PushSubscription
 from .services import announcements as service
 
 
@@ -139,3 +139,19 @@ class AnnouncementSettingsAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         # فقط مدیر اصلی تعیین می‌کند چه گروهی پیامک بفرستد.
         return request.user.is_superuser
+
+
+@admin.register(PushSubscription)
+class PushSubscriptionAdmin(admin.ModelAdmin):
+    """فقط مشاهده؛ دستگاه‌ها را خود کاربران فعال/غیرفعال می‌کنند."""
+
+    list_display = ("user", "user_agent", "created_at", "last_success_at", "failure_count")
+    search_fields = ("user__mobile", "user__last_name")
+    list_select_related = ("user",)
+    readonly_fields = ("user", "endpoint", "p256dh", "auth", "user_agent", "created_at", "last_success_at", "failure_count")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

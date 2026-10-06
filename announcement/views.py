@@ -167,3 +167,52 @@ class SentView(APIView):
                 ],
             },
         )
+
+
+# --- Web Push ----------------------------------------------------------------------
+
+class PushPublicKeyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from django.conf import settings
+
+        from .services import push
+
+        if not push.is_enabled():
+            return _failure("نوتیفیکیشن گوشی هنوز روی سرور فعال نشده است.")
+        return _ok("کلید عمومی push.", {"publicKey": settings.VAPID_PUBLIC_KEY})
+
+
+class PushSubscribeView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        from .services import push
+
+        data = request.data if isinstance(request.data, dict) else {}
+        keys = data.get("keys") if isinstance(data.get("keys"), dict) else {}
+        try:
+            push.subscribe(
+                user=request.user,
+                endpoint=str(data.get("endpoint") or ""),
+                p256dh=str(keys.get("p256dh") or ""),
+                auth=str(keys.get("auth") or ""),
+                user_agent=request.headers.get("User-Agent", ""),
+            )
+        except push.PushError as exc:
+            return _failure(str(exc))
+        return _ok("نوتیفیکیشن روی این دستگاه فعال شد.")
+
+
+class PushUnsubscribeView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request):
+        from .services import push
+
+        data = request.data if isinstance(request.data, dict) else {}
+        push.unsubscribe(user=request.user, endpoint=str(data.get("endpoint") or ""))
+        return _ok("نوتیفیکیشن روی این دستگاه غیرفعال شد.")

@@ -122,3 +122,28 @@ class AnnouncementRecipient(models.Model):
 
     def __str__(self):
         return f"{self.announcement} → {self.user}"
+
+
+class PushSubscription(models.Model):
+    """اشتراک Web Push یک مرورگر/گوشی (هر کاربر می‌تواند چند دستگاه داشته باشد)."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="push_subscriptions",
+        verbose_name="کاربر",
+    )
+    endpoint = models.URLField(max_length=1000, unique=True, verbose_name="آدرس سرویس push")
+    p256dh = models.CharField(max_length=200, verbose_name="کلید p256dh")
+    auth = models.CharField(max_length=100, verbose_name="کلید auth")
+    user_agent = models.CharField(max_length=300, blank=True, verbose_name="مرورگر")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="زمان ثبت")
+    last_success_at = models.DateTimeField(blank=True, null=True, verbose_name="آخرین ارسال موفق")
+    failure_count = models.PositiveIntegerField(default=0, verbose_name="خطاهای پشت‌سرهم")
+
+    class Meta:
+        verbose_name = "اشتراک نوتیفیکیشن گوشی"
+        verbose_name_plural = "اشتراک‌های نوتیفیکیشن گوشی"
+
+    def __str__(self):
+        return f"{self.user} - {self.user_agent[:40]}"

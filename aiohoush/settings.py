@@ -286,6 +286,14 @@ APP_ORIGIN = env.str(
     "APP_ORIGIN",
 )
 
+# --- Web Push (نوتیفیکیشن روی گوشی) ------------------------------------------
+# ساخت کلیدها: python manage.py generate_vapid_keys
+# اگر خالی باشند، push غیرفعال است و فقط زنگولهٔ داخل اپ کار می‌کند.
+VAPID_PUBLIC_KEY = env.str("VAPID_PUBLIC_KEY", default="")
+VAPID_PRIVATE_KEY = env.str("VAPID_PRIVATE_KEY", default="")
+# ایمیل یا آدرس سایت برای تماس سرویس‌های push (الزامی در استاندارد VAPID)
+VAPID_SUBJECT = env.str("VAPID_SUBJECT", default="mailto:info@aiohoush.com")
+
 # آدرسی که ویدوپل بعد از درگاه کاربر را به آن برمی‌گرداند. hostname آن
 # باید با AIOHOUSH_ALLOWED_CALLBACK_HOST در ویدوپل یکی باشد.
 AI_PAYMENT_CALLBACK_URL = env.str(
