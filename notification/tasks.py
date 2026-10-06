@@ -165,6 +165,55 @@ def send_ticket_sms(
 
 
 @shared_task(ignore_result=True)
+def send_project_sms(
+    *,
+    project_id: int,
+    event: str,
+) -> None:
+    from project.models import Project
+
+    project = (
+        Project.objects
+        .select_related("owner")
+        .filter(pk=project_id, owner__isnull=False)
+        .first()
+    )
+
+    if project is None:
+        logger.warning("Project SMS skipped; project %s not found.", project_id)
+        return
+
+    link = f"{settings.APP_ORIGIN.rstrip('/')}/dashboard/projects/{project.pk}"
+
+    if event == "rejected":
+        text = (
+            f"پروژهٔ «{project.title[:40]}» شما در آیوهوش تأیید نشد. "
+            f"دلیل را در پنل ببینید و پس از اصلاح دوباره ارسال کنید.\n{link}"
+        )
+    else:
+        raise ValueError(f"Unknown project SMS event: {event}")
+
+    prepared_messages = prepare_sms_messages(
+        messages=[
+            OutgoingSMS(
+                recipient=project.owner.mobile,
+                text=text,
+            )
+        ],
+    )
+
+    result = send_sms_requests(messages=prepared_messages)[0]
+
+    if result.status != SMSServerResponse.SMSSTATUS.SENT:
+        logger.warning(
+            "Project SMS not sent. project=%s event=%s status=%s",
+            project.pk,
+            event,
+            result.status,
+        )
+
+
+@shared_task(ignore_result=True)
 def close_stale_tickets_task() -> None:
     """برای اجرای دوره‌ای (celery beat یا cron)."""
     from ticket.services.tickets import close_stale_tickets

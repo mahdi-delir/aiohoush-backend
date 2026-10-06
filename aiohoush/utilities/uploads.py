@@ -6,6 +6,7 @@
 و می‌توانند در همان origin (مثلاً پنل ادمین) اسکریپت اجرا کنند.
 """
 
+import zipfile
 from pathlib import Path
 
 from django.core.exceptions import ValidationError
@@ -58,9 +59,13 @@ def validate_homework_attachment(file) -> None:
 
 def validate_profile_picture(file) -> str:
     """تصویر را واقعاً باز می‌کند و پسوند امن متناظر را برمی‌گرداند."""
-    if file.size > PROFILE_PICTURE_MAX_BYTES:
+    return _validate_image(file, max_bytes=PROFILE_PICTURE_MAX_BYTES)
+
+
+def _validate_image(file, *, max_bytes: int) -> str:
+    if file.size > max_bytes:
         raise ValidationError(
-            f"حجم تصویر نباید بیشتر از {_size_text(PROFILE_PICTURE_MAX_BYTES)} باشد."
+            f"حجم تصویر نباید بیشتر از {_size_text(max_bytes)} باشد."
         )
 
     try:
@@ -118,3 +123,34 @@ def validate_voice_message(file) -> None:
 
     if extension not in VOICE_ALLOWED_EXTENSIONS:
         raise ValidationError("فرمت پیام صوتی پشتیبانی نمی‌شود.")
+
+
+# --- پروژه‌ها ---------------------------------------------------------------
+
+PROJECT_IMAGE_MAX_BYTES = 3 * MB
+PROJECT_FILE_MAX_BYTES = 20 * MB
+
+
+def validate_project_image(file) -> str:
+    """اسکرین‌شات پروژه؛ پسوند امن (از روی محتوا) را برمی‌گرداند."""
+    return _validate_image(file, max_bytes=PROJECT_IMAGE_MAX_BYTES)
+
+
+def validate_project_file(file) -> None:
+    """فایل پروژه فقط zip؛ محتوا هم واقعاً zip باشد، نه فقط پسوند."""
+    if file.size > PROJECT_FILE_MAX_BYTES:
+        raise ValidationError(
+            f"حجم فایل نباید بیشتر از {_size_text(PROJECT_FILE_MAX_BYTES)} باشد."
+        )
+
+    if Path(file.name or "").suffix.lower() != ".zip":
+        raise ValidationError("فایل پروژه باید zip باشد.")
+
+    try:
+        file.seek(0)
+        is_zip = zipfile.is_zipfile(file)
+    finally:
+        file.seek(0)
+
+    if not is_zip:
+        raise ValidationError("فایل ارسال‌شده zip معتبر نیست.")

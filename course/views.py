@@ -31,8 +31,9 @@ from .access import (
     can_access_session,
     has_purchased_course,
 )
-from .models import Course, CourseCategory, CourseSeason, CourseSessionHomeworkSubmission, CourseSession, CourseSessionProgress, CourseSessionWatch, GiftVideo
+from .models import Course, CourseCategory, CourseSeason, CourseSessionHomeworkSubmission, CourseSession, CourseSessionProgress, CourseSessionWatch, GiftVideo, GiftVideoProgress
 from .services import watch as watch_service
+from .services import gift_watch as gift_watch_service
 from .permissions import CourseManagementPermission
 from .serializers import (
     CourseSerializer,
@@ -836,6 +837,83 @@ class WatchEventsView(APIView):
                 "unique_watched_ms": state.unique_watched_ms,
                 "watched_percent": state.watched_percent,
                 "last_position_ms": state.last_position_ms,
+                "completed": state.completed,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class GiftWatchStartView(APIView):
+    """شروع تماشای ویدئوی هدیه؛ موقعیت ادامهٔ پخش را برمی‌گرداند."""
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def post(self, request, gift_id):
+        gift = gift_watch_service.visible_gifts().filter(pk=gift_id).first()
+
+        if gift is None:
+            return failure_response("ویدئوی هدیه پیدا نشد.")
+
+        progress = gift_watch_service.start_gift_watch(user=request.user, gift=gift)
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="تماشا ثبت شد.",
+            data={
+                "watch_id": str(progress.watch_token),
+                "resume_position_ms": progress.last_position_ms,
+                "completed": progress.completed_at is not None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class GiftWatchEventsView(APIView):
+    """batch بازه‌های دیده‌شدهٔ ویدئوی هدیه (همان قالب جلسات دوره)."""
+
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def post(self, request, watch_id):
+        progress = (
+            GiftVideoProgress.objects
+            .filter(watch_token=watch_id, user=request.user)
+            .only("pk")
+            .first()
+        )
+
+        if progress is None:
+            return failure_response("نوبت تماشا پیدا نشد.")
+
+        serializer = WatchBatchInputSerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return failure_response(
+                first_error_message(serializer.errors),
+                detail=serializer.errors,
+            )
+
+        data = serializer.validated_data
+
+        state = gift_watch_service.record_gift_batch(
+            progress_id=progress.pk,
+            ranges=data["ranges"],
+            position_ms=data["position_ms"],
+            client_duration_ms=data.get("duration_ms"),
+            ended=any(event["event_type"] == "ended" for event in data["events"]),
+            end_reason=data.get("end_reason"),
+        )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="پیشرفت ثبت شد.",
+            data={
+                "watched_percent": state.watched_percent,
                 "completed": state.completed,
             },
             status=status.HTTP_200_OK,

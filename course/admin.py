@@ -10,6 +10,7 @@ from .models import (
     CourseSessionWatchEvent,
     CourseSessionWatchedRange,
     GiftVideo,
+    GiftVideoProgress,
 )
 
 
@@ -362,3 +363,20 @@ class GiftVideoAdmin(admin.ModelAdmin):
             "title",
         ),
     }
+
+
+@admin.register(GiftVideoProgress)
+class GiftVideoProgressAdmin(admin.ModelAdmin):
+    """فقط برای مشاهده؛ پیشرفت را پلیر ثبت می‌کند."""
+
+    list_display = ("user", "gift", "unique_watched_ms", "completed_at", "last_activity_at")
+    list_filter = ("gift", "completed_at")
+    search_fields = ("user__mobile", "user__last_name")
+    list_select_related = ("user", "gift")
+    readonly_fields = [field.name for field in GiftVideoProgress._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

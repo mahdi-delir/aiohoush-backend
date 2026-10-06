@@ -873,3 +873,53 @@ class GiftVideo(models.Model):
     def __str__(self):
         return self.title
 
+
+
+class GiftVideoProgress(models.Model):
+    """پیشرفت تماشای ویدئوی هدیه برای هر کاربر.
+
+    مثل جلسات دوره، فقط بازه‌هایی که واقعاً پخش شده‌اند شمرده می‌شوند و
+    با ۹۰٪ «زمان مشاهدهٔ یکتا» ویدئو دیده‌شده حساب می‌شود.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="gift_progresses",
+        verbose_name="کاربر",
+    )
+
+    gift = models.ForeignKey(
+        "course.GiftVideo",
+        on_delete=models.CASCADE,
+        related_name="progresses",
+        verbose_name="ویدئوی هدیه",
+    )
+
+    # شناسهٔ نوبت تماشای فعلی؛ با هر شروع پخش عوض می‌شود.
+    watch_token = models.UUIDField(
+        blank=True,
+        null=True,
+        unique=True,
+        verbose_name="شناسهٔ نوبت تماشا",
+    )
+
+    # بازه‌های ادغام‌شده [[start_ms, end_ms], ...]
+    watched_ranges = models.JSONField(default=list, blank=True, verbose_name="بازه‌های دیده‌شده")
+    unique_watched_ms = models.PositiveBigIntegerField(default=0, verbose_name="زمان مشاهدهٔ یکتا (ms)")
+    last_position_ms = models.PositiveBigIntegerField(default=0, verbose_name="آخرین موقعیت (ms)")
+    last_activity_at = models.DateTimeField(blank=True, null=True, verbose_name="آخرین فعالیت")
+    completed_at = models.DateTimeField(blank=True, null=True, verbose_name="زمان تکمیل")
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="زمان ایجاد")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="آخرین تغییر")
+
+    class Meta:
+        verbose_name = "پیشرفت ویدئوی هدیه"
+        verbose_name_plural = "پیشرفت ویدئوهای هدیه"
+        constraints = [
+            models.UniqueConstraint(fields=["user", "gift"], name="unique_gift_progress"),
+        ]
+
+    def __str__(self):
+        return f"{self.user} - {self.gift}"

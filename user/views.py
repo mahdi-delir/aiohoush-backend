@@ -266,6 +266,9 @@ class MeView(APIView):
                 "first_name": user.first_name or "",
                 "last_name": user.last_name or "",
                 "mobile": user.mobile,
+                # از روی خود فیلدها، تا کاربرانی که نامشان از ادمین
+                # پر شده هم «تکمیل‌شده» حساب شوند.
+                "is_profile_completed": user.has_complete_profile,
             },
 
             "groups": list(

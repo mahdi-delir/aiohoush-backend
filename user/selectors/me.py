@@ -8,6 +8,7 @@ from django.db.models import (
 )
 
 from course.models import Course
+from course.services.gift_watch import has_watched_all_gifts
 from order.models import Order, RequestedProduct
 from user.models import User
 
@@ -61,6 +62,10 @@ def get_user_data(
         all_sessions = course.all_sessions
         completed_sessions = course.completed_sessions
 
+        # دورهٔ تمام‌شده «فعال» حساب نمی‌شود.
+        if all_sessions and completed_sessions >= all_sessions:
+            continue
+
         completed_percent = (
             completed_sessions
             / all_sessions
@@ -73,6 +78,7 @@ def get_user_data(
             {
                 "id": course.pk,
                 "title": course.title,
+                "slug": course.slug,
 
                 "all_sessions": all_sessions,
 
@@ -89,6 +95,10 @@ def get_user_data(
         )
 
     return {
+        # همهٔ ویدئوهای هدیهٔ فعال را تا ۹۰٪ دیده باشد.
+        "watched_gift": has_watched_all_gifts(user),
+
+        # دورهٔ نیمه‌تمام دارد؛ active_courses به ترتیب نمایش دوره‌هاست.
         "has_course": bool(
             active_courses,
         ),

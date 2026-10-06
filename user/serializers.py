@@ -163,10 +163,12 @@ class CurrentUserSerializer(serializers.Serializer):
     first_name = serializers.CharField()
     last_name = serializers.CharField()
     mobile = serializers.CharField()
+    is_profile_completed = serializers.BooleanField()
 
 class ActiveCourseSerializer(serializers.Serializer):
     id = serializers.IntegerField()
     title = serializers.CharField()
+    slug = serializers.CharField()
     all_sessions = serializers.IntegerField()
     current_session = serializers.IntegerField()
     completed_percent = serializers.FloatField()
@@ -238,10 +240,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         for key, value in validated_data.items():
             setattr(instance, key, value)
-        instance.is_profile_completed = bool(
-            (instance.first_name or "").strip()
-            and (instance.last_name or "").strip()
-        )
+        instance.is_profile_completed = instance.has_complete_profile
         instance.save()
         return instance
 

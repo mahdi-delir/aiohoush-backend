@@ -154,6 +154,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         )
         return f"{self.mobile} - {full_name}" if full_name else self.mobile
 
+    @property
+    def has_complete_profile(self) -> bool:
+        """قانون «پروفایل تکمیل‌شده»: نام و نام خانوادگی پر باشد."""
+        return bool(
+            (self.first_name or "").strip()
+            and (self.last_name or "").strip()
+        )
+
     @classmethod
     def normalize_username(cls, username):
         # clean() جنگو (فرم‌ها و full_clean) از این استفاده می‌کند؛

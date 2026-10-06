@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'accounting',
     'product',
     'ticket',
+    'project',
 ]
 
 MIDDLEWARE = [

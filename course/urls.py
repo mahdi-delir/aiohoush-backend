@@ -16,6 +16,8 @@ from .views import (
     MyCourseHomeworkView,
     GiftVideoListView,
     GiftVideoDetailView,
+    GiftWatchEventsView,
+    GiftWatchStartView,
 )
 
 
@@ -76,6 +78,16 @@ urlpatterns += [
         name="gift-video-list",
     ),
 
+    path(
+        "gift-videos/<int:gift_id>/watch/",
+        GiftWatchStartView.as_view(),
+        name="gift-watch-start",
+    ),
+    path(
+        "gift-watches/<uuid:watch_id>/events/",
+        GiftWatchEventsView.as_view(),
+        name="gift-watch-events",
+    ),
     path(
         "gift-videos/<slug:slug>/",
         GiftVideoDetailView.as_view(),
