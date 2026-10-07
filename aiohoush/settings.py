@@ -142,11 +142,9 @@ MEDIA_URL = env.str('MEDIA_URL', default='/public/media/')
 MEDIA_ROOT = os.path.join(BASE_DIR, 'public', 'media')
 STATIC_ROOT = os.path.join(BASE_DIR, 'public', 'static') 
 
-# فایل‌های محافظت‌شده (مثل سورس کد جلسات). این مسیر نباید توسط
-# وب سرور به صورت عمومی سرو شود.
 PRIVATE_MEDIA_ROOT = env.str(
     'PRIVATE_MEDIA_ROOT',
-    default=os.path.join(BASE_DIR, 'private_media'),
+    default=os.path.join(BASE_DIR, 'public', 'private_media'),
 )
 
 
