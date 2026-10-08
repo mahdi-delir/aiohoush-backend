@@ -3,6 +3,8 @@ from django.urls import path
 from .views import (
     LoginOTPRequestView,
     LoginOTPVerifyView,
+    LoginDeviceRevokeView,
+    LoginDeviceRevokeAllView,
     RefreshTokenView,
     LogoutView,
     LogoutAllView,
@@ -28,6 +30,16 @@ urlpatterns = [
         "login/verify-otp/",
         LoginOTPVerifyView.as_view(),
         name="login-verify-otp",
+    ),
+    path(
+        "login/devices/revoke/",
+        LoginDeviceRevokeView.as_view(),
+        name="login-device-revoke",
+    ),
+    path(
+        "login/devices/revoke-all/",
+        LoginDeviceRevokeAllView.as_view(),
+        name="login-device-revoke-all",
     ),
     path(
     "token/refresh/",

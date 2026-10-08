@@ -28,16 +28,53 @@ from .serializers import (
     SessionTokenRefreshSerializer,
     LogoutSerializer,
     AuthSessionSerializer,
+    DeviceTicketSerializer,
+    DeviceRevokeSerializer,
     MeResponseSerializer
     )
-from .models import User, AuthSession
+from .models import User
 from .services.auth import (
+    device_limit_sessions,
+    free_device_and_login,
     login_with_otp,
     logout_session,
     logout_all_sessions,
     revoke_other_session
     )
 from .selectors.me import get_user_data
+from .services.devices import active_sessions
+
+
+def _tokens_response(tokens):
+    return APIResponse(
+        success=True,
+        called_by='webapp',
+        message=_('توکن با موفقیت صادر شد.'),
+        data=tokens,
+        status=status.HTTP_200_OK,
+    )
+
+
+def _device_limit_response(user, ticket, sessions):
+    return APIResponse(
+        success=False,
+        called_by='webapp',
+        message=_('به حداکثر تعداد دستگاه‌های مجاز رسیده‌اید. برای ورود، از یکی از دستگاه‌ها خارج شوید.'),
+        data={
+            'code': 'device_limit',
+            'ticket': ticket,
+            'max_devices': user.max_devices,
+            'sessions': AuthSessionSerializer(sessions, many=True).data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+def _login_result_response(result):
+    if result.tokens is not None:
+        return _tokens_response(result.tokens)
+    user, sessions = device_limit_sessions(result.ticket)
+    return _device_limit_response(user, result.ticket, sessions)
 
 class LoginOTPRequestView(APIView):
     authentication_classes = []
@@ -117,20 +154,47 @@ class LoginOTPVerifyView(APIView):
         except User.DoesNotExist:
             raise InvalidOTPError
 
-        tokens = login_with_otp(
+        result = login_with_otp(
             user=user,
             raw_code=code,
             request = request
         )
 
+        return _login_result_response(result)
 
-        return APIResponse(
-            success=True,
-            called_by='webapp',
-            message=_('توکن با موفقیت صادر شد.'),
-            data=tokens,
-            status=status.HTTP_200_OK,
+
+class LoginDeviceRevokeView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [OTPVerifyIPRateThrottle]
+
+    def post(self, request):
+        serializer = DeviceRevokeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        result = free_device_and_login(
+            ticket=serializer.validated_data["ticket"],
+            session_id=serializer.validated_data["session_id"],
+            request=request,
         )
+        return _login_result_response(result)
+
+
+class LoginDeviceRevokeAllView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [OTPVerifyIPRateThrottle]
+
+    def post(self, request):
+        serializer = DeviceTicketSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        result = free_device_and_login(
+            ticket=serializer.validated_data["ticket"],
+            revoke_all=True,
+            request=request,
+        )
+        return _login_result_response(result)
 
 class RefreshTokenView(APIView):
     authentication_classes = []
@@ -201,14 +265,7 @@ class ActiveSessionsView(APIView):
     def get(self, request):
         current_sid = request.auth.get("sid")
 
-        sessions = (
-            AuthSession.objects
-            .filter(
-                user=request.user,
-                revoked_at__isnull=True,
-            )
-            .order_by("-created_at")
-        )
+        sessions = active_sessions(request.user)
 
         serializer = AuthSessionSerializer(
             sessions,

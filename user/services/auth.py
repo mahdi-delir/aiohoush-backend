@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from uuid import UUID
 
 from django.db import transaction
@@ -21,6 +22,13 @@ from notification.services.otp import verify_otp
 
 from user.models import User, AuthSession
 
+from .devices import (
+    active_sessions,
+    drop_ticket,
+    has_free_device_slot,
+    issue_ticket,
+    ticket_user_id,
+)
 from .session import create_auth_session
 
 
@@ -41,6 +49,18 @@ class AuthSessionNotFound(APIException):
     default_code = "session_not_found"
 
 
+class DeviceTicketExpired(APIException):
+    status_code = status.HTTP_200_OK
+    default_detail = _("مهلت انتخاب دستگاه تمام شد؛ لطفاً دوباره وارد شوید.")
+    default_code = "device_ticket_expired"
+
+
+@dataclass(frozen=True)
+class LoginResult:
+    tokens: dict[str, str] | None = None
+    ticket: str | None = None
+
+
 class CannotRevokeCurrentSession(APIException):
     status_code = status.HTTP_200_OK
     default_detail = _(
@@ -55,7 +75,7 @@ def login_with_otp(
     user:User,
     raw_code: str,
     request: Request
-) -> dict[str, str]:
+) -> LoginResult:
     user = (
         User.objects
         .select_for_update()
@@ -78,6 +98,13 @@ def login_with_otp(
             ]
         )
 
+    if not has_free_device_slot(user):
+        return LoginResult(ticket=issue_ticket(user))
+
+    return LoginResult(tokens=issue_tokens(user=user, request=request))
+
+
+def issue_tokens(*, user: User, request: Request) -> dict[str, str]:
     refresh = RefreshToken.for_user(user)
     session = create_auth_session(user=user, request=request, refresh_jti=refresh[api_settings.JTI_CLAIM])
     refresh['sid'] = str(session.id)
@@ -86,6 +113,62 @@ def login_with_otp(
         'access': str(refresh.access_token),
         'refresh': str(refresh)
     }
+
+
+@transaction.atomic
+def free_device_and_login(
+    *,
+    ticket: str,
+    request: Request,
+    session_id: UUID | None = None,
+    revoke_all: bool = False,
+) -> LoginResult:
+    user_id = ticket_user_id(ticket)
+    if user_id is None:
+        raise DeviceTicketExpired
+
+    user = (
+        User.objects
+        .select_for_update()
+        .filter(pk=user_id)
+        .first()
+    )
+    if user is None:
+        raise DeviceTicketExpired
+    if not user.is_active:
+        raise InactiveUserError
+
+    if revoke_all:
+        logout_all_sessions(user=user)
+    elif session_id is not None:
+        session = (
+            AuthSession.objects
+            .select_for_update()
+            .filter(
+                id=session_id,
+                user=user,
+                revoked_at__isnull=True,
+            )
+            .first()
+        )
+        if session is not None:
+            _revoke_session(user=user, session=session)
+
+    if not has_free_device_slot(user):
+        return LoginResult(ticket=ticket)
+
+    transaction.on_commit(lambda: drop_ticket(ticket))
+    return LoginResult(tokens=issue_tokens(user=user, request=request))
+
+
+def device_limit_sessions(ticket: str):
+    user_id = ticket_user_id(ticket)
+    if user_id is None:
+        raise DeviceTicketExpired
+    user = User.objects.filter(pk=user_id).first()
+    if user is None:
+        raise DeviceTicketExpired
+    return user, active_sessions(user)
 
 @transaction.atomic
 def logout_session(
@@ -208,6 +291,10 @@ def revoke_other_session(
     if session is None:
         raise AuthSessionNotFound
 
+    _revoke_session(user=user, session=session)
+
+
+def _revoke_session(*, user: User, session: AuthSession) -> None:
     if session.refresh_jti:
         outstanding_token = (
             OutstandingToken.objects

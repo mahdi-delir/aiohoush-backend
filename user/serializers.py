@@ -125,6 +125,14 @@ class SessionTokenRefreshSerializer(TokenRefreshSerializer):
         )
         return data
 
+class DeviceTicketSerializer(serializers.Serializer):
+    ticket = serializers.CharField(max_length=200, trim_whitespace=False)
+
+
+class DeviceRevokeSerializer(DeviceTicketSerializer):
+    session_id = serializers.UUIDField()
+
+
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField(
         write_only=True,

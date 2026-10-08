@@ -24,7 +24,7 @@ class UserAdmin(DjangoUserAdmin):
         (None, {'fields': ('mobile', 'password')}),
         (_('اطلاعات شخصی'), {'fields': ('first_name', 'last_name', 'email', 'national_id', 'date_of_birth')}),
         (_('اطلاعات تماس و معرفی'), {'fields': ('telegram_id', 'address', 'postal_code', 'referral_code')}),
-        (_('وضعیت حساب'), {'fields': ('is_active', 'is_mobile_verified')}),
+        (_('وضعیت حساب'), {'fields': ('is_active', 'is_mobile_verified', 'max_devices')}),
         (_('دسترسی‌ها'), {
             'fields': ('is_staff', 'is_superuser', 'groups', 'user_permissions', 'denied_permissions'),
             'description': _('مجوزهای مستقیم به مجوزهای گروه‌ها اضافه می‌شوند؛ مجوزهای ممنوع‌شده با بک‌اند سفارشی از دسترسی کاربر عادی کم می‌شوند. سوپریوزر از این ممنوعیت‌ها مستثناست.'),

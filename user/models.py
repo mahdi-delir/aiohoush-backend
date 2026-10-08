@@ -3,6 +3,7 @@ import uuid
 from pathlib import Path
 
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
 from django.utils.translation import gettext_lazy as _
@@ -95,6 +96,12 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_profile_completed = models.BooleanField(
         default=False,
         verbose_name=_('پروفایل تکمیل شده است؟')
+    )
+
+    max_devices = models.PositiveSmallIntegerField(
+        default=3,
+        validators=[MinValueValidator(1)],
+        verbose_name=_('حداکثر دستگاه‌های همزمان'),
     )
     
     date_joined = models.DateTimeField(auto_now_add=True,
