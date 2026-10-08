@@ -7,6 +7,7 @@ from rest_framework.routers import (
 from .views import (
     CourseManagementViewSet,
     CourseCatalogView,
+    RecommendedCourseView,
     CourseCatalogCategoryView,
     CourseDetailView,
     HomeworkSubmissionView,
@@ -32,6 +33,11 @@ router.register(
 urlpatterns = router.urls
 
 urlpatterns += [
+    path(
+        "recommended/",
+        RecommendedCourseView.as_view(),
+        name="course-recommended",
+    ),
     path(
         "catalog/",
         CourseCatalogView.as_view(),

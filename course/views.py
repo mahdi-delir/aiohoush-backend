@@ -34,6 +34,7 @@ from .access import (
 from .models import Course, CourseCategory, CourseSeason, CourseSessionHomeworkSubmission, CourseSession, CourseSessionProgress, CourseSessionWatch, GiftVideo, GiftVideoProgress
 from .services import watch as watch_service
 from .services import gift_watch as gift_watch_service
+from .services.recommendation import recommend_course
 from .permissions import CourseManagementPermission
 from .serializers import (
     CourseSerializer,
@@ -43,6 +44,7 @@ from .serializers import (
     HomeworkSubmissionSerializer,
     GiftVideoSerializer,
     WatchBatchInputSerializer,
+    format_duration,
 )
 from order.models import Order, RequestedProduct
 
@@ -173,6 +175,48 @@ class CourseManagementViewSet(
             message='دوره با موفقیت منتشر شد.',
             status=status.HTTP_200_OK
         )
+
+class RecommendedCourseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        course = recommend_course(request.user)
+
+        if course is not None:
+            course = (
+                Course.objects
+                .annotate(total_duration=course_total_duration())
+                .get(pk=course.pk)
+            )
+
+        return APIResponse(
+            success=True,
+            called_by="webapp",
+            message="دوره‌ی پیشنهادی دریافت شد.",
+            data={
+                "course": (
+                    {
+                        "id": course.pk,
+                        "title": course.title,
+                        "slug": course.slug,
+                        "cover": (
+                            request.build_absolute_uri(course.poster.url)
+                            if course.poster
+                            else None
+                        ),
+                        "duration": (
+                            format_duration(course.total_duration)
+                            if course.total_duration
+                            else None
+                        ),
+                        "level": course.get_level_display(),
+                    }
+                    if course is not None
+                    else None
+                ),
+            },
+        )
+
 
 class CourseCatalogView(APIView):
     permission_classes = [IsAuthenticated]
