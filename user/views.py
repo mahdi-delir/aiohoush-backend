@@ -1,5 +1,6 @@
 from uuid import UUID
 
+from django.conf import settings
 from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.models import Group
@@ -124,7 +125,7 @@ class LoginOTPRequestView(APIView):
             called_by='webapp',
             message='درخواست ارسال پیامک انجام شد.',
             status=status.HTTP_202_ACCEPTED,
-            data={}
+            data={"expires_in": settings.OTP_EXPIRATION_SECONDS}
         )
 
 class LoginOTPVerifyView(APIView):
