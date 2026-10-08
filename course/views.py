@@ -51,6 +51,19 @@ from order.models import Order, RequestedProduct
 
 logger = logging.getLogger(__name__)
 
+MAX_SEARCH_LENGTH = 100
+
+
+def normalize_search(value) -> str:
+    if not isinstance(value, str):
+        return ""
+    value = value.replace("ي", "ی").replace("ك", "ک").replace("\u200c", " ")
+    return " ".join(value.split())[:MAX_SEARCH_LENGTH]
+
+
+def search_variants(term: str) -> set[str]:
+    return {term, term.replace("ی", "ي").replace("ک", "ك")}
+
 def course_total_duration():
     """مجموع مدت جلسات دوره به صورت subquery.
 
@@ -259,6 +272,29 @@ class CourseCatalogView(APIView):
         if category:
             queryset = queryset.filter(
                 categories__slug=category,
+            )
+
+        search = normalize_search(
+            request.query_params.get("q")
+        )
+
+        if search:
+            matches = Course.objects.all()
+
+            for term in search.split():
+                condition = Q()
+
+                for variant in search_variants(term):
+                    condition |= (
+                        Q(title__icontains=variant)
+                        | Q(description__icontains=variant)
+                        | Q(categories__title__icontains=variant)
+                    )
+
+                matches = matches.filter(condition)
+
+            queryset = queryset.filter(
+                pk__in=matches.values("pk"),
             )
 
         serializer = (
