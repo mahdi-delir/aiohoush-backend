@@ -15,12 +15,10 @@ from django.utils import timezone
 
 from course.models import GiftVideo, GiftVideoProgress
 from course.services.watch import (
-    BUDGET_SLACK,
     COMPLETION_RATIO,
-    MAX_CLIENT_DURATION_MS,
-    MAX_PLAYBACK_RATE,
     _clip_ranges,
     merge_ranges,
+    remaining_budget_ms,
 )
 
 
@@ -49,12 +47,9 @@ def has_watched_all_gifts(user) -> bool:
     return completed == gift_ids
 
 
-def gift_duration_ms(gift: GiftVideo, client_duration_ms: int | None = None) -> int | None:
+def gift_duration_ms(gift: GiftVideo) -> int | None:
     if gift.duration and gift.duration.total_seconds() > 0:
         return int(gift.duration.total_seconds() * 1000)
-
-    if client_duration_ms and 0 < client_duration_ms <= MAX_CLIENT_DURATION_MS:
-        return client_duration_ms
 
     return None
 
@@ -72,9 +67,15 @@ def start_gift_watch(*, user, gift: GiftVideo) -> GiftVideoProgress:
     progress, _ = GiftVideoProgress.objects.get_or_create(user=user, gift=gift)
     progress = GiftVideoProgress.objects.select_for_update().get(pk=progress.pk)
 
+    now = timezone.now()
     progress.watch_token = uuid.uuid4()
-    progress.last_activity_at = timezone.now()
-    progress.save(update_fields=["watch_token", "last_activity_at", "updated_at"])
+    progress.watch_started_at = now
+    progress.watch_credited_ms = 0
+    progress.last_activity_at = now
+    progress.save(update_fields=[
+        "watch_token", "watch_started_at", "watch_credited_ms",
+        "last_activity_at", "updated_at",
+    ])
 
     return progress
 
@@ -85,7 +86,6 @@ def record_gift_batch(
     progress_id: int,
     ranges: list[tuple[int, int]],
     position_ms: int,
-    client_duration_ms: int | None,
     ended: bool,
     end_reason: str | None,
 ) -> GiftWatchState:
@@ -95,18 +95,22 @@ def record_gift_batch(
         .select_related("gift")
         .get(pk=progress_id)
     )
-    duration_ms = gift_duration_ms(progress.gift, client_duration_ms)
+    duration_ms = gift_duration_ms(progress.gift)
     now = timezone.now()
 
-    last_activity = progress.last_activity_at or progress.created_at
-    elapsed = (now - last_activity) + BUDGET_SLACK
-    budget_ms = int(elapsed.total_seconds() * 1000 * MAX_PLAYBACK_RATE)
+    budget_ms = remaining_budget_ms(
+        started_at=progress.watch_started_at or progress.last_activity_at or progress.created_at,
+        credited_ms=progress.watch_credited_ms,
+        now=now,
+    )
 
-    accepted, _ = _clip_ranges(
+    accepted, credited_ms = _clip_ranges(
         merge_ranges(ranges),
         duration_ms=duration_ms,
         budget_ms=budget_ms,
     )
+
+    progress.watch_credited_ms += credited_ms
 
     if accepted:
         existing = [tuple(item) for item in progress.watched_ranges]
@@ -134,7 +138,8 @@ def record_gift_batch(
 
     progress.save(update_fields=[
         "watched_ranges", "unique_watched_ms", "last_position_ms",
-        "last_activity_at", "completed_at", "watch_token", "updated_at",
+        "last_activity_at", "completed_at", "watch_token",
+        "watch_credited_ms", "updated_at",
     ])
 
     return GiftWatchState(

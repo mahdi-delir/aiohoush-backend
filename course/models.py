@@ -4,6 +4,7 @@ from pathlib import Path
 
 from datetime import timedelta
 
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
@@ -396,6 +397,14 @@ class CourseSession(models.Model):
                 name="unique_season_session_order",
             ),
         ]
+    def clean(self):
+        super().clean()
+        has_duration = self.duration and self.duration.total_seconds() > 0
+        if self.video_url and not has_duration:
+            raise ValidationError({
+                "duration": "برای جلسه‌ای که ویدئو دارد، مدت زمان ویدئو را وارد کنید.",
+            })
+
     def __str__(self):
         return f"{self.season.course.title} - {self.season.title} - {self.title}"
 
@@ -738,6 +747,7 @@ class CourseSessionHomeworkSubmission(models.Model):
 
     attachment = models.FileField(
         upload_to=homework_submission_upload_to,
+        storage=private_media_storage,
         blank=True,
         null=True,
     )
@@ -870,6 +880,13 @@ class GiftVideo(models.Model):
 
         ordering = ["order", "-created_at"]
 
+    def clean(self):
+        super().clean()
+        if not self.duration or self.duration.total_seconds() <= 0:
+            raise ValidationError({
+                "duration": "مدت زمان ویدئو را وارد کنید.",
+            })
+
     def __str__(self):
         return self.title
 
@@ -903,6 +920,8 @@ class GiftVideoProgress(models.Model):
         unique=True,
         verbose_name="شناسهٔ نوبت تماشا",
     )
+    watch_started_at = models.DateTimeField(blank=True, null=True, verbose_name="شروع نوبت تماشا")
+    watch_credited_ms = models.PositiveBigIntegerField(default=0, verbose_name="زمان ثبت‌شده در نوبت فعلی (ms)")
 
     # بازه‌های ادغام‌شده [[start_ms, end_ms], ...]
     watched_ranges = models.JSONField(default=list, blank=True, verbose_name="بازه‌های دیده‌شده")

@@ -1,3 +1,4 @@
+from pathlib import Path
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.urls import reverse
 
@@ -421,6 +422,15 @@ class CourseCatalogSerializer(
         ]
 
 class HomeworkSubmissionSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["attachment"] = (
+            Path(instance.attachment.name).name
+            if instance.attachment
+            else None
+        )
+        return data
+
     class Meta:
         model = (
             CourseSessionHomeworkSubmission

@@ -710,6 +710,46 @@ class SessionSourceCodeView(APIView):
         )
 
 
+class HomeworkAttachmentView(APIView):
+    permission_classes = [
+        IsAuthenticated,
+    ]
+
+    def get(self, request, submission_id):
+        submission = (
+            CourseSessionHomeworkSubmission.objects
+            .select_related("session__season__course")
+            .filter(pk=submission_id)
+            .first()
+        )
+
+        user = request.user
+        allowed = submission is not None and (
+            submission.student_id == user.pk
+            or submission.session.season.course.teacher_id == user.pk
+            or user.has_perm("course.review_homework_submission")
+        )
+
+        if not allowed or not submission.attachment:
+            return failure_response("فایل پیدا نشد.")
+
+        try:
+            file = submission.attachment.open("rb")
+        except FileNotFoundError:
+            logger.error(
+                "Homework attachment missing for submission %s: %s",
+                submission.pk,
+                submission.attachment.name,
+            )
+            raise Http404("فایل تمرین پیدا نشد.")
+
+        return FileResponse(
+            file,
+            as_attachment=True,
+            filename=Path(submission.attachment.name).name,
+        )
+
+
 class MyCourseHomeworkView(APIView):
     permission_classes = [
         IsAuthenticated,
@@ -902,7 +942,6 @@ class WatchEventsView(APIView):
             events=data["events"],
             ranges=data["ranges"],
             position_ms=data["position_ms"],
-            client_duration_ms=data.get("duration_ms"),
             end_reason=data.get("end_reason"),
         )
 
@@ -983,7 +1022,6 @@ class GiftWatchEventsView(APIView):
             progress_id=progress.pk,
             ranges=data["ranges"],
             position_ms=data["position_ms"],
-            client_duration_ms=data.get("duration_ms"),
             ended=any(event["event_type"] == "ended" for event in data["events"]),
             end_reason=data.get("end_reason"),
         )

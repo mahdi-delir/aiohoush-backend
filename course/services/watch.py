@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import F, Max
+from django.db.models import F
 from django.utils import timezone
 
 from course.models import (
@@ -37,10 +37,6 @@ COMPLETION_RATIO = 0.9
 MAX_PLAYBACK_RATE = 2.0
 BUDGET_SLACK = timedelta(seconds=20)
 
-# سقف مدت ویدئو که از کلاینت پذیرفته می‌شود (وقتی duration جلسه ثبت نشده)
-MAX_CLIENT_DURATION_MS = 6 * 60 * 60 * 1000
-
-
 @dataclass(frozen=True, slots=True)
 class WatchState:
     unique_watched_ms: int
@@ -51,15 +47,17 @@ class WatchState:
 
 def session_duration_ms(
     session: CourseSession,
-    client_duration_ms: int | None = None,
 ) -> int | None:
-    if session.duration:
+    if session.duration and session.duration.total_seconds() > 0:
         return int(session.duration.total_seconds() * 1000)
 
-    if client_duration_ms and 0 < client_duration_ms <= MAX_CLIENT_DURATION_MS:
-        return client_duration_ms
-
     return None
+
+
+def remaining_budget_ms(*, started_at, credited_ms: int, now) -> int:
+    elapsed = (now - started_at) + BUDGET_SLACK
+    allowed = int(elapsed.total_seconds() * 1000 * MAX_PLAYBACK_RATE)
+    return max(0, allowed - credited_ms)
 
 
 def progress_percent(
@@ -172,7 +170,6 @@ def record_watch_batch(
     events: list[dict],
     ranges: list[tuple[int, int]],
     position_ms: int,
-    client_duration_ms: int | None,
     end_reason: str | None,
 ) -> WatchState | None:
     """یک batch را ثبت می‌کند. None یعنی نوبت تماشا قبلاً بسته شده."""
@@ -188,7 +185,7 @@ def record_watch_batch(
         .get(pk=watch.progress_id)
     )
     session = watch.progress.session
-    duration_ms = session_duration_ms(session, client_duration_ms)
+    duration_ms = session_duration_ms(session)
 
     if watch.ended_at is not None:
         return None
@@ -211,11 +208,6 @@ def record_watch_batch(
     # شمرده نمی‌شود.
     if events and not new_events:
         return _state(progress, duration_ms)
-
-    last_activity = (
-        watch.events.aggregate(last=Max("created_at"))["last"]
-        or watch.started_at
-    )
 
     CourseSessionWatchEvent.objects.bulk_create(
         [
@@ -241,8 +233,11 @@ def record_watch_batch(
     )
 
     # --- بازه‌های دیده‌شده، محدود به زمان واقعی سپری‌شده
-    elapsed = (now - last_activity) + BUDGET_SLACK
-    budget_ms = int(elapsed.total_seconds() * 1000 * MAX_PLAYBACK_RATE)
+    budget_ms = remaining_budget_ms(
+        started_at=watch.started_at,
+        credited_ms=watch.watched_ms,
+        now=now,
+    )
 
     accepted, watched_ms = _clip_ranges(
         merge_ranges(ranges),

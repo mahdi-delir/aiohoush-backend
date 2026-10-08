@@ -15,6 +15,7 @@ from .views import (
     SessionWatchStartView,
     WatchEventsView,
     MyCourseHomeworkView,
+    HomeworkAttachmentView,
     GiftVideoListView,
     GiftVideoDetailView,
     GiftWatchEventsView,
@@ -72,6 +73,11 @@ urlpatterns += [
         "catalog/<slug:slug>/",
         CourseDetailView.as_view(),
         name="course-detail",
+    ),
+    path(
+        "homework/<int:submission_id>/attachment/",
+        HomeworkAttachmentView.as_view(),
+        name="homework-attachment",
     ),
     path(
         "homework/mine/",
