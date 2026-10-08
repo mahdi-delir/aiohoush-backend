@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from notification.models import OTPSMSToken, SMSServerResponse
+from notification.services.sms_alerts import record_sms_result
 
 
 PAYAMRESAN_MAX_MESSAGES_PER_REQUEST = 90
@@ -186,6 +187,8 @@ def send_sms_requests(
                     )
                 )
 
+                record_sms_result(status=SMSServerResponse.SMSSTATUS.FAILED, body=None)
+
                 continue
 
             except requests.exceptions.ReadTimeout:
@@ -204,6 +207,8 @@ def send_sms_requests(
                         http_status=None,
                     )
                 )
+
+                record_sms_result(status=SMSServerResponse.SMSSTATUS.FAILED, body=None)
 
                 continue
 
@@ -224,6 +229,8 @@ def send_sms_requests(
                     )
                 )
 
+                record_sms_result(status=SMSServerResponse.SMSSTATUS.FAILED, body=None)
+
                 continue
 
             except requests.exceptions.RequestException as exc:
@@ -242,6 +249,8 @@ def send_sms_requests(
                         http_status=None,
                     )
                 )
+
+                record_sms_result(status=SMSServerResponse.SMSSTATUS.FAILED, body=None)
 
                 continue
 
@@ -266,6 +275,8 @@ def send_sms_requests(
                         http_status=response.status_code,
                     )
                 )
+
+                record_sms_result(status=SMSServerResponse.SMSSTATUS.FAILED, body=parsed_body)
 
                 continue
 
@@ -294,5 +305,7 @@ def send_sms_requests(
                     http_status=response.status_code,
                 )
             )
+
+            record_sms_result(status=status, body=parsed_body)
 
     return results
